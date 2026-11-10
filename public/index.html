@@ -6,10 +6,21 @@
     <title>GoPlan - Actividades</title>
     <link rel="stylesheet" href="estilos.css">
     <script src="main.js" defer></script>
+    <script src="auth.js" defer></script>
 </head>
 <body>
     <main>
         <h1>GoPlan</h1>
+        <section aria-labelledby="tituloLogin">
+            <h2 id="tituloLogin">Iniciar sesión</h2>
+            <form id="login">
+                <label>Email <input name="email" type="email" autocomplete="username" required></label>
+                <label>Contraseña <input name="password" type="password" autocomplete="current-password" required maxlength="1024"></label>
+                <button type="submit">Ingresar</button>
+            </form>
+            <p id="estadoSesion" role="status" aria-live="polite"></p>
+            <button id="cerrarSesion" type="button" hidden>Cerrar sesión</button>
+        </section>
         <h2>Agregar actividad</h2>
         <form id="formulario">
             <label>Nombre <input name="nombre" required></label>

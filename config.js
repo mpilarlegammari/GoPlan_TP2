@@ -1,4 +1,5 @@
 import dotenv from 'dotenv'
+import { randomBytes } from 'node:crypto'
 
 dotenv.config({quiet: true})
 
@@ -7,11 +8,15 @@ const CSC_API_KEY = process.env.CSC_API_KEY
 const MODO_PERSISTENCIA = process.env.MODO_PERSISTENCIA || ''
 const STRCNX = process.env.STRCNX || 'mongodb://localhost:27017'
 const BASE = process.env.BASE || 'test'
+const JWT_SECRET = process.env.JWT_SECRET || randomBytes(32).toString('hex')
+const APP_ORIGIN = process.env.APP_ORIGIN || 'http://localhost:8080'
 
 export default {
     PORT,
     CSC_API_KEY,
     MODO_PERSISTENCIA,
     STRCNX,
-    BASE
+    BASE,
+    JWT_SECRET,
+    APP_ORIGIN
 }

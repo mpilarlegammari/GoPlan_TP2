@@ -1,6 +1,8 @@
 import express from 'express'
 import RouterActividades from './router/actividades.js'
 import RouterUbicaciones from './router/ubicaciones.js'
+import RouterAuth from './router/auth.js'
+import cookieParser from 'cookie-parser'
 
 
 class Server {
@@ -17,13 +19,15 @@ class Server {
     start() {
         const app = express()
         
-        app.use(express.json())
+        app.use(express.json({ limit: '16kb' }))
+        app.use(cookieParser())
         app.use(express.urlencoded({extended:true}))
 
         app.use(express.static('public'))
 
         app.use('/api/actividades', this.#RouterActividades.config())
         app.use('/api/ubicaciones', this.#RouterUbicaciones.config())
+        app.use('/api/auth', new RouterAuth().config())
 
         const server = app.listen(this.#port, () => console.log(`Servidor ApiRestful escuchando en http://localhost:${this.#port}`))
         server.on('error', error => console.log(`Error en servidor: ${error.message}`))

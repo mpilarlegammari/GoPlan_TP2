@@ -12,3 +12,4 @@ li { border-bottom: 1px solid #ccc; padding: 16px 0; }
 li h3 { margin: 0 0 8px; }
 li p { margin: 6px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .error { color: #a11919; }
+[hidden] { display: none !important; }

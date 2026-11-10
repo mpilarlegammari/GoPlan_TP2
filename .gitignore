@@ -1,2 +1,5 @@
 .env
-/node_modules
+node_modules/
+LOGIN.md 
+test/
+scripts/
