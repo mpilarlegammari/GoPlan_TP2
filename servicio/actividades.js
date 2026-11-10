@@ -26,5 +26,14 @@ class Servicio{
         const actividadGuardada = await this.#modelo.guardarActividad(actividadModelo)
         return actividadGuardada
     }
+
+    modificarActividad = async (id, actividad)=>{
+        const actividadActualizada = await this.#modelo.modificarActividad(id, actividad)
+        return actividadActualizada
+    }
+
+    eliminarActividad = async (id)=>{
+        return this.#modelo.eliminarActividad(id)
+    }
 }
 export default Servicio

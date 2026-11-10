@@ -1,5 +1,3 @@
-//import ModeloFile from "./productosFile.js"
-import ModeloMem from "./actividadesMem.js"
 import ModeloMongoDB from "./actividadesMongoDB.js"
 
 
@@ -8,20 +6,20 @@ class ModelFactory {
 
         switch(tipo) {
             case 'MEM':
-                console.log('*** Persistiendo en Memoria ***')
-                return new ModeloMem()
+                console.log('*** Persistiendo en Memoria - No implementado***')
+                //return new ModeloMem()
 
             case 'FILE':
-                console.log('*** Persistiendo en File System ***')
-                return new ModeloFile()
+                console.log('*** Persistiendo en File System - No implementado ***')
+                //return new ModeloFile()
 
             case 'MONGODB':
                 console.log('*** Persistiendo en base de datos MongoDB ***')
                 return new ModeloMongoDB()
 
             default:
-                console.log('*** Persistiendo en Memoria (default) ***')
-                return new ModeloMem()
+                console.log('*** Persistiendo en MongoDB (default) ***')
+                return new ModeloMongoDB()
         }
     }
 }

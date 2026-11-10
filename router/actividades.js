@@ -13,6 +13,8 @@ class RouterActividades{
         
         router.get('{/:id}',this.#controladorActividades.obtenerActividades)
         router.post('/',this.#controladorActividades.guardarActividad)
+        router.put('/:id',this.#controladorActividades.modificarActividad)
+        router.delete('/:id',this.#controladorActividades.eliminarActividad)
 
         return router
     }

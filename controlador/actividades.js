@@ -14,6 +14,40 @@ class Controlador{
                 res.send(actividadNueva)
             }
             catch(error) {
+                const status = error.isJoi ? 400 : 500
+                res.status(status).json({ url: req.url, method: req.method, error: error.message })
+            }
+    }
+
+    modificarActividad = async (req,res) =>{
+            try {
+                const { id } = req.params
+                const actividad = await this.#servicioActividades.modificarActividad(id, req.body)
+
+                if (!actividad) {
+                    return res.status(404).json({ error: 'Actividad no encontrada' })
+                }
+
+                res.json(actividad)
+            }
+            catch(error) {
+                const status = error.isJoi ? 400 : 500
+                res.status(status).json({ url: req.url, method: req.method, error: error.message })
+            }
+    }
+
+    eliminarActividad = async (req,res) =>{
+            try {
+                const { id } = req.params
+                const eliminada = await this.#servicioActividades.eliminarActividad(id)
+
+                if (!eliminada) {
+                    return res.status(404).json({ error: 'Actividad no encontrada' })
+                }
+
+                res.status(204).end()
+            }
+            catch(error) {
                 res.status(500).json({ url: req.url, method: req.method, error: error.message })
             }
     }

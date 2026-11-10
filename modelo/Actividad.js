@@ -9,7 +9,8 @@ cupo= null
 precio= null
 ubicacion= null
 
-    constructor({
+    constructor(actividad = {}) {
+        const {
         nombre,
         descripcion,
         categoria,
@@ -17,7 +18,8 @@ ubicacion= null
         cupo,
         precio,
         ubicacion
-    }) {
+        } = actividad || {}
+
         this.nombre = nombre
         this.descripcion = descripcion
         this.categoria = categoria
@@ -25,16 +27,16 @@ ubicacion= null
         this.cupo = cupo
         this.precio = precio
 
-        this.ubicacion = {
-            pais: {
+        this.ubicacion = ubicacion && {
+            pais: ubicacion.pais && {
                 codigo: ubicacion.pais.codigo,
                 nombre: ubicacion.pais.nombre
             },
-            provincia: {
+            provincia: ubicacion.provincia && {
                 codigo: ubicacion.provincia.codigo,
                 nombre: ubicacion.provincia.nombre
             },
-            ciudad: {
+            ciudad: ubicacion.ciudad && {
                 idExterno: ubicacion.ciudad.idExterno,
                 nombre: ubicacion.ciudad.nombre
             },
@@ -80,7 +82,7 @@ ubicacion= null
     const {error} = schemaProducto.validate(this.get())
 
         if(error) {
-            throw new Error(error)
+            throw error
         }
     }
 
