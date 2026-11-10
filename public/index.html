@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GoPlan - Actividades</title>
+    <link rel="stylesheet" href="estilos.css">
+    <script src="main.js" defer></script>
+</head>
+<body>
+    <main>
+        <h1>GoPlan</h1>
+        <h2>Agregar actividad</h2>
+        <form id="formulario">
+            <label>Nombre <input name="nombre" required></label>
+            <label>Descripción <textarea name="descripcion" required></textarea></label>
+            <label>Categoría <input name="categoria" required></label>
+            <label>Fecha y hora <input name="fechaInicio" type="datetime-local" required></label>
+            <label>Cupo <input name="cupo" type="number" min="1" step="1" required></label>
+            <label>Precio ($) <input name="precio" type="number" min="0" step="0.01" value="0" required></label>
+            <label>País <select name="pais" required disabled></select></label>
+            <label>Provincia <select name="provincia" required disabled></select></label>
+            <label>Ciudad <select name="ciudad" required disabled></select></label>
+            <p id="estadoUbicaciones" role="status" aria-live="polite"></p>
+            <button id="reintentarUbicaciones" type="button" hidden>Reintentar ubicaciones</button>
+            <label>Dirección <input name="direccion" required></label>
+            <button type="submit" disabled>Agregar actividad</button>
+        </form>
+        <p id="mensaje" role="status" aria-live="polite"></p>
+        <h2>Actividades</h2>
+        <p id="estadoLista" role="status"></p>
+        <button id="recargar" type="button">Actualizar lista</button>
+        <ul id="actividades"></ul>
+    </main>
+</body>
+</html>

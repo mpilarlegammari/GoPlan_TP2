@@ -1,0 +1,14 @@
+body { font-family: Arial, sans-serif; margin: 24px; color: #222; }
+main { max-width: 680px; margin: auto; }
+form { display: grid; gap: 12px; }
+label { display: grid; gap: 4px; }
+input, textarea, select, button { font: inherit; padding: 8px; }
+input, textarea, select { min-width: 0; border: 1px solid #888; border-radius: 4px; }
+textarea { min-height: 60px; resize: vertical; }
+button { cursor: pointer; }
+button:disabled { cursor: wait; }
+ul { padding: 0; list-style: none; }
+li { border-bottom: 1px solid #ccc; padding: 16px 0; }
+li h3 { margin: 0 0 8px; }
+li p { margin: 6px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.error { color: #a11919; }
