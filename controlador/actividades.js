@@ -31,7 +31,7 @@ class Controlador{
                 res.json(actividad)
             }
             catch(error) {
-                const status = error.isJoi ? 400 : 500
+                const status = error.isJoi ? 400 : error.status || 500
                 res.status(status).json({ url: req.url, method: req.method, error: error.message })
             }
     }
