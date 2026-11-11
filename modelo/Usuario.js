@@ -26,6 +26,15 @@ class Usuario {
         return Usuario.#validarDatos(Joi.object(camposPerfil).min(1), datos)
     }
 
+    static validarPerfilGoogle(datos) {
+        return Usuario.#validarDatos(Joi.object({
+            nombre: camposPerfil.nombre.required(),
+            apellido: camposPerfil.apellido.required(),
+            email: camposPerfil.email.required(),
+            googleId: Joi.string().min(1).max(255).required()
+        }), datos)
+    }
+
     apellido = undefined
     nombre = null
     email = null

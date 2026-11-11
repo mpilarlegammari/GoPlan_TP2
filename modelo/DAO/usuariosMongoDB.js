@@ -23,6 +23,10 @@ class ModeloUsuariosMongoDB {
 
     buscarPorEmail = email => this.#coleccion().findOne({ email })
 
+    buscarPorGoogleId = googleId => this.#coleccion().findOne(
+        { googleId }, { projection: { passwordHash: 0 } }
+    )
+
     buscarPorId = id => {
         if (!/^[a-f0-9]{24}$/i.test(id)) return null
         return this.#coleccion().findOne({ _id: new ObjectId(id) }, { projection: { passwordHash: 0 } })

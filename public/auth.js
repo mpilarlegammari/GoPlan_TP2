@@ -1,51 +1,46 @@
-const login = document.querySelector('#login')
+import { solicitarApi } from './api.js'
+import { crearFormularioAuth } from './formularioAuth.js'
+
+const acceso = document.querySelector('#acceso')
 const estadoSesion = document.querySelector('#estadoSesion')
 const cerrarSesion = document.querySelector('#cerrarSesion')
 
-function mostrarSesion(usuario) {
-    login.hidden = Boolean(usuario)
-    cerrarSesion.hidden = !usuario
-    estadoSesion.className = ''
-    estadoSesion.textContent = usuario ? `Conectado: ${usuario.nombre} (${usuario.rol})` : 'Sesión no iniciada'
+function mostrarMensaje(texto, error = false) {
+    estadoSesion.className = error ? 'error' : ''
+    estadoSesion.textContent = texto
 }
 
+function mostrarSesion(usuario) {
+    acceso.hidden = Boolean(usuario)
+    cerrarSesion.hidden = !usuario
+    mostrarMensaje(usuario
+        ? `Conectado: ${[usuario.nombre, usuario.apellido].filter(Boolean).join(' ')} (${usuario.rol})`
+        : 'Sesión no iniciada')
+}
+
+const formulario = crearFormularioAuth({ contenedor: acceso, mostrarMensaje, alIngresar: mostrarSesion })
+
+// Bloquea el formulario hasta resolver la sesión inicial para evitar respuestas tardías.
+acceso.inert = true
+mostrarMensaje('Consultando sesión...')
 async function consultarSesion() {
     try {
-        const respuesta = await fetch('/api/auth/me')
-        if (respuesta.status === 401) return mostrarSesion(null)
-        if (!respuesta.ok) throw new Error('No se pudo consultar la sesión')
-        mostrarSesion((await respuesta.json()).usuario)
-    } catch (error) { estadoSesion.textContent = error.message }
-}
-
-login.addEventListener('submit', async evento => {
-    evento.preventDefault()
-    const boton = login.querySelector('button')
-    boton.disabled = true
-    try {
-        const respuesta = await fetch('/api/auth/login', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: login.elements.email.value, password: login.elements.password.value })
-        })
-        const datos = await respuesta.json()
-        if (!respuesta.ok) throw new Error(datos.error || 'No se pudo iniciar sesión')
-        login.reset()
-        mostrarSesion(datos.usuario)
+        mostrarSesion((await solicitarApi('/api/auth/me')).usuario)
     } catch (error) {
-        estadoSesion.className = 'error'
-        estadoSesion.textContent = error.message
-    } finally { boton.disabled = false }
-})
+        if (error.status === 401) {
+            mostrarSesion(null)
+        }
+        else mostrarMensaje(error.message, true)
+    } finally { acceso.inert = false }
+}
 
 cerrarSesion.addEventListener('click', async () => {
     cerrarSesion.disabled = true
     try {
-        const respuesta = await fetch('/api/auth/logout', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
-        })
-        if (!respuesta.ok) throw new Error('No se pudo cerrar sesión')
+        await solicitarApi('/api/auth/logout', { method: 'POST', datos: {} })
+        formulario.reiniciar()
         mostrarSesion(null)
-    } catch (error) { estadoSesion.textContent = error.message }
+    } catch (error) { mostrarMensaje(error.message, true) }
     finally { cerrarSesion.disabled = false }
 })
 

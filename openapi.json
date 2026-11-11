@@ -907,6 +907,87 @@
           }
         ]
       }
+    },
+    "/api/auth/google/config": {
+      "get": {
+        "summary": "Obtener configuración pública y desafío para Google",
+        "responses": {
+          "200": {
+            "description": "Client ID y nonce; establece cookie HttpOnly goplan_google por diez minutos"
+          },
+          "503": {
+            "description": "Google no configurado"
+          }
+        }
+      }
+    },
+    "/api/auth/google": {
+      "post": {
+        "summary": "Ingresar o registrarse con Google",
+        "description": "Requiere cookie goplan_google obtenida desde /api/auth/google/config. Verifica el ID token y su nonce. No vincula cuentas por coincidencia de email. Responde con usuario público y cookie goplan_session.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "credential"
+                ],
+                "properties": {
+                  "credential": {
+                    "type": "string",
+                    "maxLength": 12000
+                  },
+                  "nombre": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 100
+                  },
+                  "apellido": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 100
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sesión iniciada"
+          },
+          "400": {
+            "description": "Entrada inválida"
+          },
+          "401": {
+            "description": "Token/desafío inválido o vencido, email no verificado o cuenta deshabilitada"
+          },
+          "403": {
+            "description": "Origen no permitido"
+          },
+          "409": {
+            "description": "Email ya registrado"
+          },
+          "415": {
+            "description": "Se requiere JSON"
+          },
+          "422": {
+            "description": "Completar nombre y apellido y reenviar la credencial con el desafío vigente"
+          },
+          "429": {
+            "description": "Demasiados intentos"
+          },
+          "500": {
+            "description": "No se pudo iniciar sesión"
+          },
+          "503": {
+            "description": "Google no configurado"
+          }
+        }
+      }
     }
   },
   "components": {

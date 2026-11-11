@@ -13,6 +13,8 @@ class RouterAuth {
         const router = express.Router()
         router.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next() })
         router.post('/login', protegerOrigen, limitarLogin(), this.#controladorAuth.login)
+        router.get('/google/config', this.#controladorAuth.configurarGoogle)
+        router.post('/google', protegerOrigen, limitarLogin(), this.#controladorAuth.loginGoogle)
         router.get('/me', autenticar(), this.#controladorAuth.actual)
         router.post('/logout', protegerOrigen, this.#controladorAuth.logout)
         return router

@@ -11,6 +11,7 @@ const BASE = process.env.BASE || 'test'
 // TODO: Exigir JWT_SECRET estable en producción; reservar el secreto temporal para desarrollo.
 const JWT_SECRET = process.env.JWT_SECRET || randomBytes(32).toString('hex')
 const APP_ORIGIN = process.env.APP_ORIGIN || 'http://localhost:8080'
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID?.trim() || ''
 
 export default {
     PORT,
@@ -19,5 +20,6 @@ export default {
     STRCNX,
     BASE,
     JWT_SECRET,
-    APP_ORIGIN
+    APP_ORIGIN,
+    GOOGLE_CLIENT_ID
 }

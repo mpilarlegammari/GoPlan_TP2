@@ -627,7 +627,7 @@ El login requiere un usuario activo existente en la colección `usuarios` de la 
 
 ## Alcance y pruebas
 
-Los 11 endpoints anteriores representan la implementación actual. Se incluyen alta de usuarios y modificación del perfil propio. No se incluye login con Google ni administración de otros usuarios. El rol todavía no restringe las operaciones de actividades.
+Los 11 endpoints anteriores representan la implementación actual. Se incluyen alta de usuarios y modificación del perfil propio. Se incluye login con Google. No se incluye administración de otros usuarios. El rol todavía no restringe las operaciones de actividades.
 
 Ejecutar `node --test` para las pruebas HTTP del login con persistencia simulada. `npm test` todavía contiene el mensaje predeterminado de pruebas no configuradas.
 
@@ -651,3 +651,18 @@ Responde `201` con `{ "usuario": { ... } }`, sin contraseña ni hash. El rol sie
 Nombre y apellido admiten entre 2 y 100 caracteres, sin espacios exteriores. Email se normaliza a minúsculas. La contraseña de alta admite de 8 a 128 caracteres y se persiste como hash Argon2id. Campos adicionales y cuerpos vacíos son rechazados (`400`); emails duplicados devuelven `409`. Los POST/PATCH requieren JSON y el origen configurado si se envía `Origin`.
 
 El alta establece `createdAt` y `updatedAt`; la edición conserva `createdAt` y renueva `updatedAt`. Los documentos anteriores sin apellido siguen siendo compatibles con el arranque y el login; pueden completar ese campo al editar su perfil. La validación Joi pertenece a la aplicación: no es un validador de colección en MongoDB.
+
+## Acceso con Google
+
+Configurar `GOOGLE_CLIENT_ID` en `.env` con el ID OAuth de tipo aplicación web. Autorizar `http://localhost` y `http://localhost:8080` como orígenes JavaScript en Google Cloud. Reiniciar el servidor. La interfaz de Google está en el proyecto Vue `go-plan-pnt2`, en `/login` y `/registro`; autorizar también el origen exacto de Vite (por ejemplo `http://localhost:5173`) en Google Cloud. El frontend simple de `http://localhost:8080` solo tiene login por credenciales, creación y listado de actividades. No requiere Client Secret ni URI de redirección para este flujo con popup y callback JavaScript.
+
+- `GET /api/auth/google/config`: devuelve el Client ID público y un nonce aleatorio, y establece una cookie HttpOnly de desafío que vence en diez minutos. No expone secretos de configuración.
+- `POST /api/auth/google`: recibe `{ "credential": "ID_TOKEN" }` y la cookie de desafío. Verifica firma, audiencia, emisor y vencimiento con `google-auth-library`, además del nonce y `email_verified`. Devuelve `{ "usuario": { ... } }` y la cookie habitual `goplan_session`; no devuelve el token de GoPlan en JSON.
+- Una identidad existente se busca por `sub`, persistido como `googleId`. No se actualizan automáticamente el nombre ni el email de cuentas existentes. Si está deshabilitada, se rechaza el acceso.
+- Para una identidad nueva se crea un usuario activo con rol `usuario`, sin contraseña local. Si Google no entrega nombre/apellido compatibles, se responde `422` y el frontend pide completar ambos campos. Se reenvía la misma credencial junto con `nombre` y `apellido`, manteniendo el desafío vigente.
+- Si el email ya pertenece a otra cuenta, devuelve `409` y no vincula identidades automáticamente. La vinculación de cuentas todavía no está implementada; esa cuenta debe ingresar con su método habitual.
+- Entrada inválida: `400`; token o desafío inválido/vencido, email no verificado o cuenta deshabilitada: `401`; origen no permitido: `403`; email duplicado: `409`; perfil incompleto: `422`; demasiados intentos: `429`; Google sin configurar: `503`.
+
+La credencial Google se mantiene solamente en memoria durante la finalización del registro; no se guarda en localStorage ni en MongoDB. El logout elimina las cookies de GoPlan y desactiva la selección automática de Google en el navegador, sin cerrar la cuenta de Google del usuario.
+
+Pruebas: `node --test`. La suite de Google simula el proveedor y la persistencia; la verificación completa con una cuenta real se realiza en el navegador. La carpeta `test/` sigue excluida de Git por la configuración existente.
