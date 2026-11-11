@@ -27,6 +27,8 @@ class Servicio{
         return actividadGuardada
     }
 
+    // TODO: Solicitar validación y normalización al modelo Actividad antes de modificar;
+    // aceptar únicamente campos editables y rechazar campos adicionales.
     modificarActividad = async (id, actividad)=>{
         const actividadActualizada = await this.#modelo.modificarActividad(id, actividad)
         return actividadActualizada

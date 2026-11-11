@@ -1,5 +1,6 @@
 import Servicio from '../servicio/auth.js'
 
+// TODO: Configurar secure para despliegues HTTPS y conservar las mismas opciones al cerrar sesión.
 const opcionesCookie = {
     httpOnly: true, sameSite: 'strict', path: '/api'
 }

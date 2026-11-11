@@ -3,18 +3,23 @@ import Usuario from '../Usuario.js'
 import { ObjectId } from 'mongodb'
 
 class ModeloUsuariosMongoDB {
-    buscarOtroAdministrador = email => this.#coleccion().findOne({
-        rol: 'admin', email: { $ne: email }
-    }, { projection: { _id: 1 } })
-
-    guardarUsuarioPrueba = async usuario => {
+    guardarUsuario = async usuario => {
+        // TODO: Solicitar esta validación desde el servicio; dedicar el DAO a persistencia.
         usuario.validar()
-        const { createdAt, ...actualizacion } = usuario.get()
-        return this.#coleccion().updateOne({ email: usuario.email }, {
-            $set: actualizacion,
-            $setOnInsert: { createdAt }
-        }, { upsert: true })
+        const documento = usuario.get()
+        const { insertedId } = await this.#coleccion().insertOne(documento)
+        // TODO: Unificar las respuestas de alta y modificación con la representación pública
+        // explícita de Auth, evitando exponer automáticamente nuevos campos del documento.
+        const { passwordHash, ...publico } = documento
+        return { ...publico, _id: insertedId }
     }
+
+    // TODO: Devolver la misma representación pública definida para alta, login y /me.
+    modificarUsuario = (id, cambios) => this.#coleccion().findOneAndUpdate(
+        { _id: new ObjectId(id), activo: true },
+        { $set: { ...cambios, updatedAt: new Date() } },
+        { returnDocument: 'after', projection: { passwordHash: 0 } }
+    )
 
     buscarPorEmail = email => this.#coleccion().findOne({ email })
 
@@ -35,7 +40,7 @@ class ModeloUsuariosMongoDB {
         for await (const datos of this.#coleccion().find({})) {
             const usuario = new Usuario(datos)
             try {
-                usuario.validar()
+                usuario.validar({ permitirSinApellido: true })
             } catch {
                 throw new Error('Hay usuarios incompatibles con el modelo; se requiere revisar los datos antes de continuar')
             }

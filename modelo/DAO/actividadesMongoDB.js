@@ -15,9 +15,11 @@ class ModeloMongoDB{
         return actividades
     }
 
+    // TODO: Validar el ID antes de construir ObjectId y comunicar entrada inválida (400).
     obtenerActividad= async(id)=>{
         this.#validarConexion()
         const actividad = await CnxMongoDB.db.collection('actividades').findOne({ _id: new ObjectId(id)})
+        // TODO: Devolver null cuando no exista y traducir ese resultado a 404 en la capa HTTP.
         return actividad || {}
     }
 
@@ -27,6 +29,8 @@ class ModeloMongoDB{
         return actividad
     }
 
+    // TODO: Definir y proteger cambios de fecha, nombre y ubicación con reservas existentes;
+    // resolver la coherencia de sus copias y contemplar operaciones concurrentes.
     modificarActividad = async (id, actividad) => {
         this.#validarConexion()
         if (!ObjectId.isValid(id)) return null
@@ -64,6 +68,8 @@ class ModeloMongoDB{
         return actualizada
     }
 
+    // TODO: Definir la política de eliminación con reservas confirmadas y garantizarla
+    // atómicamente frente a nuevas reservas para evitar referencias huérfanas.
     eliminarActividad = async (id) => {
         this.#validarConexion()
         if (!ObjectId.isValid(id)) return false

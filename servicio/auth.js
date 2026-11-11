@@ -48,10 +48,12 @@ class ServicioAuth {
         return this.#obtenerUsuarioPublico(usuario)
     }
 
+    // TODO: Compartir esta representación pública explícita con el alta y la modificación de usuarios.
     #obtenerUsuarioPublico = usuario => {
         return {
             _id: usuario._id,
             nombre: usuario.nombre,
+            apellido: usuario.apellido ?? '',
             email: usuario.email,
             rol: usuario.rol
         }

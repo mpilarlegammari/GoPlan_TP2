@@ -1,6 +1,32 @@
 import Joi from 'joi'
 
+const camposPerfil = {
+    nombre: Joi.string().trim().min(2).max(100),
+    apellido: Joi.string().trim().min(2).max(100),
+    email: Joi.string().trim().lowercase().email({ tlds: { allow: false } }).max(254)
+}
+
 class Usuario {
+    static #validarDatos(schema, datos) {
+        const { error, value } = schema.required().validate(datos)
+        if (error) throw error
+        return value
+    }
+
+    static validarAlta(datos) {
+        return Usuario.#validarDatos(Joi.object({
+            nombre: camposPerfil.nombre.required(),
+            apellido: camposPerfil.apellido.required(),
+            email: camposPerfil.email.required(),
+            password: Joi.string().min(8).max(128).required()
+        }), datos)
+    }
+
+    static validarModificacion(datos) {
+        return Usuario.#validarDatos(Joi.object(camposPerfil).min(1), datos)
+    }
+
+    apellido = undefined
     nombre = null
     email = null
     passwordHash = undefined
@@ -13,6 +39,7 @@ class Usuario {
     constructor(usuario = {}) {
         const {
             nombre,
+            apellido,
             email,
             passwordHash,
             googleId,
@@ -22,6 +49,7 @@ class Usuario {
             updatedAt = createdAt
         } = usuario || {}
 
+        this.apellido = typeof apellido === 'string' ? apellido.trim() : apellido
         this.nombre = typeof nombre === 'string' ? nombre.trim() : nombre
         this.email = typeof email === 'string' ? email.trim().toLowerCase() : email
         this.passwordHash = passwordHash
@@ -32,10 +60,11 @@ class Usuario {
         this.updatedAt = updatedAt
     }
 
-    validar() {
+    validar({ permitirSinApellido = false } = {}) {
         const schemaUsuario = Joi.object({
-            nombre: Joi.string().min(2).max(100).required(),
-            email: Joi.string().email({ tlds: { allow: false } }).max(254).required(),
+            apellido: permitirSinApellido ? camposPerfil.apellido : camposPerfil.apellido.required(),
+            nombre: camposPerfil.nombre.required(),
+            email: camposPerfil.email.required(),
             passwordHash: Joi.string().pattern(/^\$argon2id\$v=19\$m=\d+,t=\d+,p=\d+\$[A-Za-z0-9+/]+\$[A-Za-z0-9+/]+$/),
             googleId: Joi.string().min(1).max(255),
             rol: Joi.string().valid('admin', 'usuario').required(),
@@ -55,6 +84,7 @@ class Usuario {
     get() {
         return {
             nombre: this.nombre,
+            ...(this.apellido !== undefined && { apellido: this.apellido }),
             email: this.email,
             ...(this.passwordHash !== undefined && { passwordHash: this.passwordHash }),
             ...(this.googleId !== undefined && { googleId: this.googleId }),

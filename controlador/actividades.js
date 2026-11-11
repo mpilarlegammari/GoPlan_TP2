@@ -1,6 +1,8 @@
 import Servicio from "../servicio/actividades.js";
 
 class Controlador{
+    // TODO: En todos los manejadores, respetar errores esperados (400/404/409) y
+    // devolver mensajes genéricos para errores 500, sin exponer error.message interno.
     #servicioActividades = null
     constructor(){
         this.#servicioActividades = new Servicio()
@@ -11,6 +13,7 @@ class Controlador{
                 //console.log(req)
                 const actividad = req.body
                 const actividadNueva = await this.#servicioActividades.guardarActividad(actividad)
+                // TODO: Responder 201 al crear una actividad.
                 res.send(actividadNueva)
             }
             catch(error) {
@@ -52,6 +55,7 @@ class Controlador{
             }
     }
 
+    // TODO: Responder 400 para IDs inválidos y 404 si la actividad consultada no existe.
     obtenerActividades = async (req,res) =>{
             try {
                 //console.log(req)

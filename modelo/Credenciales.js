@@ -4,6 +4,8 @@ class Credenciales {
     email = null
     password = null
 
+    // TODO: Validar la entrada original con Joi en este modelo para rechazar campos adicionales;
+    // actualmente el constructor los descarta antes de la validación.
     constructor(credenciales = {}) {
         const { email, password } = credenciales || {}
 

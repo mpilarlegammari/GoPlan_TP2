@@ -1,6 +1,7 @@
 import ModeloMongoDB from './usuariosMongoDB.js'
 
 class ModelFactory {
+    // TODO: Rechazar MEM y FILE mientras no estén implementados, en lugar de usar MongoDB silenciosamente.
     static get(tipo) {
         switch (tipo) {
             case 'MEM':

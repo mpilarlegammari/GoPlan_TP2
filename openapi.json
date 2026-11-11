@@ -1,0 +1,1137 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "GoPlan API",
+    "version": "1.0.0",
+    "description": "Documentación del comportamiento actual. Solo /api/auth/me exige sesión. No hay registro público, Google, reservas ni autorización del CRUD por rol. Los identificadores y ubicaciones de los ejemplos son ilustrativos."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Servidor local"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Autenticación",
+      "description": "Login y sesión con JWT en cookie HttpOnly."
+    },
+    {
+      "name": "Actividades",
+      "description": "CRUD público en el estado actual."
+    },
+    {
+      "name": "Ubicaciones",
+      "description": "Consultas a CountryStateCity desde el backend."
+    }
+  ],
+  "paths": {
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "Autenticación"
+        ],
+        "operationId": "login",
+        "summary": "Iniciar sesión",
+        "description": "Verifica email, contraseña Argon2id y estado activo. Entrega el JWT en una cookie HttpOnly (goplan_session), SameSite=Strict, Path=/api y duración de una hora. No devuelve Bearer token en el cuerpo. Si se envía Origin debe coincidir con APP_ORIGIN.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Credenciales"
+              },
+              "example": {
+                "email": "nombre@dominio.com",
+                "password": "CONTRASEÑA_DEL_USUARIO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sesión iniciada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sesion"
+                },
+                "example": {
+                  "usuario": {
+                    "_id": "507f1f77bcf86cd799439011",
+                    "nombre": "Nombre Apellido",
+                    "email": "nombre@dominio.com",
+                    "rol": "admin",
+                    "apellido": "Apellido"
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Evita almacenar respuestas de sesión.",
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              },
+              "Set-Cookie": {
+                "description": "Cookie de sesión. El cliente debe conservarla para /me.",
+                "schema": {
+                  "type": "string",
+                  "example": "goplan_session=JWT; Max-Age=3600; Path=/api; HttpOnly; SameSite=Strict"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Email o contraseña inválidos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Email o contraseña incorrectos, cuenta sin contraseña o usuario deshabilitado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Origen no permitido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Se requiere Content-Type: application/json.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Diez intentos por IP cada quince minutos. Límite en memoria por proceso.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos hasta reintentar.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "No se pudo iniciar sesión.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "Autenticación"
+        ],
+        "operationId": "usuarioActual",
+        "summary": "Consultar la sesión",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "description": "Valida el JWT de la cookie y consulta nuevamente al usuario en MongoDB para verificar que exista y esté activo.",
+        "responses": {
+          "200": {
+            "description": "Usuario autenticado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sesion"
+                },
+                "example": {
+                  "usuario": {
+                    "_id": "507f1f77bcf86cd799439011",
+                    "nombre": "Nombre Apellido",
+                    "email": "nombre@dominio.com",
+                    "rol": "admin",
+                    "apellido": "Apellido"
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "Evita almacenar respuestas de sesión.",
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión inválida o vencida: cookie ausente, JWT inválido, usuario inexistente o inactivo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "No se pudo comprobar la sesión.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "Autenticación"
+        ],
+        "operationId": "logout",
+        "summary": "Cerrar sesión",
+        "description": "Elimina la cookie del cliente. No requiere sesión válida. No revoca copias del JWT, que vencen en una hora.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {}
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Cookie eliminada. Sin cuerpo.",
+            "headers": {
+              "Cache-Control": {
+                "description": "Evita almacenar respuestas de sesión.",
+                "schema": {
+                  "type": "string",
+                  "example": "no-store"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Origen no permitido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Se requiere Content-Type: application/json.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/actividades": {
+      "get": {
+        "tags": [
+          "Actividades"
+        ],
+        "operationId": "listarActividades",
+        "summary": "Listar actividades",
+        "description": "Acceso público. Sin filtros ni paginación implementados.",
+        "responses": {
+          "200": {
+            "description": "Lista completa; [] si no hay actividades.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Actividad"
+                  }
+                },
+                "example": [
+                  {
+                    "_id": "507f1f77bcf86cd799439012",
+                    "nombre": "Caminata urbana",
+                    "descripcion": "Recorrido guiado por los principales puntos de la ciudad.",
+                    "categoria": "Turismo",
+                    "fechaInicio": "2030-12-15T14:00:00.000Z",
+                    "cupo": 20,
+                    "precio": 15000,
+                    "ubicacion": {
+                      "pais": {
+                        "codigo": "AR",
+                        "nombre": "Argentina"
+                      },
+                      "provincia": {
+                        "codigo": "CODIGO_PROVINCIA",
+                        "nombre": "Provincia de ejemplo"
+                      },
+                      "ciudad": {
+                        "idExterno": 123,
+                        "nombre": "Ciudad de ejemplo"
+                      },
+                      "direccion": "Avenida de ejemplo 1234"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "500": {
+            "description": "Error de persistencia.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Actividades"
+        ],
+        "operationId": "crearActividad",
+        "summary": "Crear actividad",
+        "description": "Acceso público actualmente. Valida el alta con Joi. La fecha debe ser futura. La ubicación del ejemplo es ilustrativa; obtener códigos reales de los endpoints de ubicaciones.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActividadEntrada"
+              },
+              "example": {
+                "nombre": "Caminata urbana",
+                "descripcion": "Recorrido guiado por los principales puntos de la ciudad.",
+                "categoria": "Turismo",
+                "fechaInicio": "2030-12-15T14:00:00.000Z",
+                "cupo": 20,
+                "precio": 15000,
+                "ubicacion": {
+                  "pais": {
+                    "codigo": "AR",
+                    "nombre": "Argentina"
+                  },
+                  "provincia": {
+                    "codigo": "CODIGO_PROVINCIA",
+                    "nombre": "Provincia de ejemplo"
+                  },
+                  "ciudad": {
+                    "idExterno": 123,
+                    "nombre": "Ciudad de ejemplo"
+                  },
+                  "direccion": "Avenida de ejemplo 1234"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Actividad guardada. La implementación devuelve 200, no 201.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Actividad"
+                },
+                "example": {
+                  "_id": "507f1f77bcf86cd799439012",
+                  "nombre": "Caminata urbana",
+                  "descripcion": "Recorrido guiado por los principales puntos de la ciudad.",
+                  "categoria": "Turismo",
+                  "fechaInicio": "2030-12-15T14:00:00.000Z",
+                  "cupo": 20,
+                  "precio": 15000,
+                  "ubicacion": {
+                    "pais": {
+                      "codigo": "AR",
+                      "nombre": "Argentina"
+                    },
+                    "provincia": {
+                      "codigo": "CODIGO_PROVINCIA",
+                      "nombre": "Provincia de ejemplo"
+                    },
+                    "ciudad": {
+                      "idExterno": 123,
+                      "nombre": "Ciudad de ejemplo"
+                    },
+                    "direccion": "Avenida de ejemplo 1234"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos rechazados por Joi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error de persistencia.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/actividades/{id}": {
+      "get": {
+        "tags": [
+          "Actividades"
+        ],
+        "operationId": "obtenerActividad",
+        "summary": "Consultar actividad por ID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ObjectId devuelto al crear o listar una actividad.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            },
+            "example": "507f1f77bcf86cd799439012"
+          }
+        ],
+        "description": "Acceso público. Si un ID válido no existe, la implementación devuelve {} con 200. Un ID mal formado puede devolver 500.",
+        "responses": {
+          "200": {
+            "description": "Actividad encontrada o {} si no existe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Actividad"
+                    },
+                    {
+                      "type": "object",
+                      "maxProperties": 0
+                    }
+                  ]
+                },
+                "example": {
+                  "_id": "507f1f77bcf86cd799439012",
+                  "nombre": "Caminata urbana",
+                  "descripcion": "Recorrido guiado por los principales puntos de la ciudad.",
+                  "categoria": "Turismo",
+                  "fechaInicio": "2030-12-15T14:00:00.000Z",
+                  "cupo": 20,
+                  "precio": 15000,
+                  "ubicacion": {
+                    "pais": {
+                      "codigo": "AR",
+                      "nombre": "Argentina"
+                    },
+                    "provincia": {
+                      "codigo": "CODIGO_PROVINCIA",
+                      "nombre": "Provincia de ejemplo"
+                    },
+                    "ciudad": {
+                      "idExterno": 123,
+                      "nombre": "Ciudad de ejemplo"
+                    },
+                    "direccion": "Avenida de ejemplo 1234"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "ID mal formado o error de persistencia.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Actividades"
+        ],
+        "operationId": "modificarActividad",
+        "summary": "Modificar actividad",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ObjectId devuelto al crear o listar una actividad.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            },
+            "example": "507f1f77bcf86cd799439012"
+          }
+        ],
+        "description": "Acceso público. Aplica $set a los campos enviados. Actualmente no ejecuta la validación Joi del alta. Si se envía ubicacion se reemplaza ese objeto completo. No enviar _id.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "example": {
+                "nombre": "Caminata actualizada",
+                "cupo": 25,
+                "precio": 18000
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Documento actualizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Actividad"
+                },
+                "example": {
+                  "_id": "507f1f77bcf86cd799439012",
+                  "nombre": "Caminata actualizada",
+                  "descripcion": "Recorrido guiado por los principales puntos de la ciudad.",
+                  "categoria": "Turismo",
+                  "fechaInicio": "2030-12-15T14:00:00.000Z",
+                  "cupo": 25,
+                  "precio": 18000,
+                  "ubicacion": {
+                    "pais": {
+                      "codigo": "AR",
+                      "nombre": "Argentina"
+                    },
+                    "provincia": {
+                      "codigo": "CODIGO_PROVINCIA",
+                      "nombre": "Provincia de ejemplo"
+                    },
+                    "ciudad": {
+                      "idExterno": 123,
+                      "nombre": "Ciudad de ejemplo"
+                    },
+                    "direccion": "Avenida de ejemplo 1234"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Actividad no encontrada o ID inválido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error de persistencia.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Actividades"
+        ],
+        "operationId": "eliminarActividad",
+        "summary": "Eliminar actividad",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ObjectId devuelto al crear o listar una actividad.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            },
+            "example": "507f1f77bcf86cd799439012"
+          }
+        ],
+        "description": "Acceso público. Eliminación del documento.",
+        "responses": {
+          "204": {
+            "description": "Eliminada. Sin cuerpo."
+          },
+          "404": {
+            "description": "Actividad no encontrada o ID inválido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error de persistencia.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ubicaciones/paises": {
+      "get": {
+        "tags": [
+          "Ubicaciones"
+        ],
+        "operationId": "listarPaises",
+        "summary": "Listar países",
+        "description": "Usar iso2 del país como parámetro pais en la siguiente consulta. Requiere CSC_API_KEY en el backend. Transmite el JSON de CountryStateCity sin transformar; la estructura depende del proveedor.",
+        "responses": {
+          "200": {
+            "description": "JSON devuelto por CountryStateCity.",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "502": {
+            "description": "Falta la clave, error del proveedor, timeout o fallo de comunicación.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ubicaciones/paises/{pais}/provincias": {
+      "get": {
+        "tags": [
+          "Ubicaciones"
+        ],
+        "operationId": "listarProvincias",
+        "summary": "Listar provincias o estados",
+        "description": "Usar iso2 de la provincia como parámetro provincia en la consulta de ciudades. Requiere CSC_API_KEY en el backend. Transmite el JSON de CountryStateCity sin transformar; la estructura depende del proveedor.",
+        "parameters": [
+          {
+            "name": "pais",
+            "in": "path",
+            "required": true,
+            "description": "Código iso2 obtenido de la lista de países.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "AR"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON devuelto por CountryStateCity.",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "502": {
+            "description": "Falta la clave, error del proveedor, timeout o fallo de comunicación.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ubicaciones/paises/{pais}/provincias/{provincia}/ciudades": {
+      "get": {
+        "tags": [
+          "Ubicaciones"
+        ],
+        "operationId": "listarCiudades",
+        "summary": "Listar ciudades",
+        "description": "Usar id como ubicacion.ciudad.idExterno y name como nombre al crear una actividad. Requiere CSC_API_KEY en el backend. Transmite el JSON de CountryStateCity sin transformar; la estructura depende del proveedor.",
+        "parameters": [
+          {
+            "name": "pais",
+            "in": "path",
+            "required": true,
+            "description": "Código iso2 obtenido de la lista de países.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "AR"
+          },
+          {
+            "name": "provincia",
+            "in": "path",
+            "required": true,
+            "description": "Código iso2 obtenido de la lista de provincias. Reemplazar el ejemplo.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "CODIGO_PROVINCIA"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON devuelto por CountryStateCity.",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "502": {
+            "description": "Falta la clave, error del proveedor, timeout o fallo de comunicación.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/usuarios": {
+      "post": {
+        "summary": "Crear usuario",
+        "description": "Requiere JSON. Alta con rol usuario; edición limitada al usuario autenticado. No devuelve passwordHash.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "nombre": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 100
+                  },
+                  "apellido": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 100
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 254
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 128,
+                    "writeOnly": true
+                  }
+                },
+                "required": [
+                  "nombre",
+                  "apellido",
+                  "email",
+                  "password"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Usuario guardado; devuelve un objeto usuario sin contraseña ni hash."
+          },
+          "400": {
+            "description": "Datos inválidos"
+          },
+          "409": {
+            "description": "Email ya registrado"
+          },
+          "403": {
+            "description": "Origen no permitido"
+          },
+          "415": {
+            "description": "Se requiere JSON"
+          },
+          "500": {
+            "description": "Error de persistencia"
+          },
+          "429": {
+            "description": "Demasiados intentos"
+          }
+        }
+      }
+    },
+    "/api/usuarios/me": {
+      "patch": {
+        "summary": "Modificar el perfil propio",
+        "description": "Requiere JSON. Alta con rol usuario; edición limitada al usuario autenticado. No devuelve passwordHash.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "nombre": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 100
+                  },
+                  "apellido": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 100
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 254
+                  }
+                },
+                "minProperties": 1
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Usuario guardado; devuelve un objeto usuario sin contraseña ni hash."
+          },
+          "400": {
+            "description": "Datos inválidos"
+          },
+          "409": {
+            "description": "Email ya registrado"
+          },
+          "403": {
+            "description": "Origen no permitido"
+          },
+          "415": {
+            "description": "Se requiere JSON"
+          },
+          "500": {
+            "description": "Error de persistencia"
+          },
+          "401": {
+            "description": "Sesión inválida o vencida"
+          },
+          "404": {
+            "description": "Usuario no encontrado"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "goplan_session",
+        "description": "Obtenida mediante POST /api/auth/login. En Postman conservar la cookie. No usar Bearer."
+      }
+    },
+    "schemas": {
+      "Credenciales": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254,
+            "description": "Se normaliza quitando espacios exteriores y pasando a minúsculas."
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        }
+      },
+      "UsuarioPublico": {
+        "type": "object",
+        "required": [
+          "_id",
+          "nombre",
+          "email",
+          "rol"
+        ],
+        "properties": {
+          "_id": {
+            "type": "string",
+            "description": "Identificador MongoDB."
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "rol": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "usuario"
+            ]
+          },
+          "apellido": {
+            "type": "string",
+            "description": "Apellido; puede estar ausente en documentos anteriores."
+          }
+        }
+      },
+      "Sesion": {
+        "type": "object",
+        "required": [
+          "usuario"
+        ],
+        "properties": {
+          "usuario": {
+            "$ref": "#/components/schemas/UsuarioPublico"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "description": "Presente en algunos errores de los controladores."
+          },
+          "method": {
+            "type": "string"
+          }
+        }
+      },
+      "ActividadEntrada": {
+        "type": "object",
+        "required": [
+          "nombre",
+          "descripcion",
+          "categoria",
+          "fechaInicio",
+          "cupo",
+          "precio",
+          "ubicacion"
+        ],
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 100
+          },
+          "descripcion": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 1000
+          },
+          "categoria": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 50
+          },
+          "fechaInicio": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Fecha ISO posterior al momento del alta."
+          },
+          "cupo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "precio": {
+            "type": "number",
+            "minimum": 0
+          },
+          "ubicacion": {
+            "$ref": "#/components/schemas/Ubicacion"
+          }
+        }
+      },
+      "Actividad": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ActividadEntrada"
+          },
+          {
+            "type": "object",
+            "required": [
+              "_id"
+            ],
+            "properties": {
+              "_id": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "Ubicacion": {
+        "type": "object",
+        "required": [
+          "pais",
+          "provincia",
+          "ciudad",
+          "direccion"
+        ],
+        "properties": {
+          "pais": {
+            "type": "object",
+            "required": [
+              "codigo",
+              "nombre"
+            ],
+            "properties": {
+              "codigo": {
+                "type": "string",
+                "pattern": "^[A-Z]{2}$"
+              },
+              "nombre": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "provincia": {
+            "type": "object",
+            "required": [
+              "codigo",
+              "nombre"
+            ],
+            "properties": {
+              "codigo": {
+                "type": "string",
+                "minLength": 1
+              },
+              "nombre": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "ciudad": {
+            "type": "object",
+            "required": [
+              "idExterno",
+              "nombre"
+            ],
+            "properties": {
+              "idExterno": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "nombre": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "direccion": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 200
+          }
+        }
+      }
+    }
+  }
+}

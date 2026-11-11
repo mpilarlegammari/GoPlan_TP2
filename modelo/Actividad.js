@@ -79,6 +79,8 @@ ubicacion= null
         }).required()
     })
 
+    // TODO: Conservar el value normalizado de Joi para persistir números, fechas y textos
+    // con los tipos y formatos validados; actualmente solo se comprueba error.
     const {error} = schemaProducto.validate(this.get())
 
         if(error) {
