@@ -30,6 +30,9 @@ class Servicio{
     // TODO: Solicitar validación y normalización al modelo Actividad antes de modificar;
     // aceptar únicamente campos editables y rechazar campos adicionales.
     modificarActividad = async (id, actividad)=>{
+        if (actividad && Object.hasOwn(actividad, 'fechaInicio')) {
+            actividad = { ...actividad, fechaInicio: Actividad.validarFechaModificacion(actividad.fechaInicio) }
+        }
         const actividadActualizada = await this.#modelo.modificarActividad(id, actividad)
         return actividadActualizada
     }

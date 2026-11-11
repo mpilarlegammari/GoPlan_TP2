@@ -44,6 +44,16 @@ ubicacion= null
         }
 
         }
+    static validarFechaModificacion(fechaInicio) {
+        const { error, value } = Joi.date().iso().required().validate(fechaInicio)
+        if (error) {
+            throw Object.assign(new Error('La fecha de inicio debe ser una fecha ISO válida'), {
+                status: 400
+            })
+        }
+        return value
+    }
+
     validar(){
 
         const schemaProducto = Joi.object({

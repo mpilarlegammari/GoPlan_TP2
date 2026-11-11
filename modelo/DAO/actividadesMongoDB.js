@@ -29,8 +29,6 @@ class ModeloMongoDB{
         return actividad
     }
 
-    // TODO: Definir y proteger cambios de fecha, nombre y ubicación con reservas existentes;
-    // resolver la coherencia de sus copias y contemplar operaciones concurrentes.
     modificarActividad = async (id, actividad) => {
         this.#validarConexion()
         if (!ObjectId.isValid(id)) return null
@@ -48,10 +46,24 @@ class ModeloMongoDB{
             throw Object.assign(new Error('El cupo debe ser un entero positivo'), { status: 400 })
         }
 
-        if (cambiaCupo) {
-            // MongoDB comprueba la ocupación en la misma operación que cambia el cupo.
-            filtro.$expr = { $lte: [{ $ifNull: ['$cuposReservados', 0] }, cambios.cupo] }
+        const ocupacion = { $ifNull: ['$cuposReservados', 0] }
+        const condiciones = []
+        if (cambiaCupo) condiciones.push({ $lte: [ocupacion, cambios.cupo] })
+        if (Object.keys(cambios).some((campo) => campo.startsWith('fechaInicio.'))) {
+            throw Object.assign(new Error('La fecha de inicio debe enviarse como un solo campo'), {
+                status: 400
+            })
         }
+        const cambiaFecha = Object.hasOwn(cambios, 'fechaInicio')
+        if (cambiaFecha) {
+            // Una fecha equivalente en otro huso horario no implica una reprogramación.
+            const fechaActual = { $convert: { input: '$fechaInicio', to: 'date', onError: null } }
+            condiciones.push({ $or: [
+                { $eq: [ocupacion, 0] },
+                { $eq: [fechaActual, cambios.fechaInicio] }
+            ] })
+        }
+        if (condiciones.length) filtro.$expr = { $and: condiciones }
 
         if (!Object.keys(cambios).length) return actividades.findOne({ _id })
 
@@ -60,23 +72,32 @@ class ModeloMongoDB{
             { $set: cambios },
             { returnDocument: 'after' }
         )
-        if (!actualizada && cambiaCupo && await actividades.findOne({ _id })) {
-            throw Object.assign(new Error('El cupo no puede ser menor que los lugares reservados'), {
-                status: 409
-            })
+        if (!actualizada && condiciones.length && await actividades.findOne({ _id })) {
+            const mensaje = cambiaFecha && cambiaCupo
+                ? 'El cambio de fecha o cupo entra en conflicto con las reservas confirmadas'
+                : cambiaFecha
+                    ? 'No se puede reprogramar una actividad con reservas confirmadas'
+                    : 'El cupo no puede ser menor que los lugares reservados'
+            throw Object.assign(new Error(mensaje), { status: 409 })
         }
         return actualizada
     }
 
-    // TODO: Definir la política de eliminación con reservas confirmadas y garantizarla
-    // atómicamente frente a nuevas reservas para evitar referencias huérfanas.
     eliminarActividad = async (id) => {
         this.#validarConexion()
         if (!ObjectId.isValid(id)) return false
 
-        const resultado = await CnxMongoDB.db.collection('actividades').deleteOne({
-            _id: new ObjectId(id)
+        const actividades = CnxMongoDB.db.collection('actividades')
+        const _id = new ObjectId(id)
+        const resultado = await actividades.deleteOne({
+            _id,
+            $expr: { $eq: [{ $ifNull: ['$cuposReservados', 0] }, 0] }
         })
+        if (!resultado.deletedCount && await actividades.findOne({ _id })) {
+            throw Object.assign(new Error('No se puede eliminar una actividad con reservas confirmadas'), {
+                status: 409
+            })
+        }
         return resultado.deletedCount > 0
     }
 }

@@ -627,9 +627,9 @@ El login requiere un usuario activo existente en la colección `usuarios` de la 
 
 ## Alcance y pruebas
 
-Los 11 endpoints anteriores representan la implementación actual. Se incluyen alta de usuarios y modificación del perfil propio. Se incluye login con Google. No se incluye administración de otros usuarios. El rol todavía no restringe las operaciones de actividades.
+La API incluye las operaciones de reservas propias documentadas abajo. Se incluyen alta de usuarios y modificación del perfil propio. Se incluye login con Google. No se incluye administración de otros usuarios. El rol todavía no restringe las operaciones de actividades.
 
-Ejecutar `node --test` para las pruebas HTTP del login con persistencia simulada. `npm test` todavía contiene el mensaje predeterminado de pruebas no configuradas.
+Ejecutar `node --test` para las pruebas HTTP del login con persistencia simulada. `npm test` ejecuta las pruebas disponibles con Node.
 
 ## Alta y modificación de usuarios
 
@@ -666,3 +666,26 @@ Configurar `GOOGLE_CLIENT_ID` en `.env` con el ID OAuth de tipo aplicación web.
 La credencial Google se mantiene solamente en memoria durante la finalización del registro; no se guarda en localStorage ni en MongoDB. El logout elimina las cookies de GoPlan y desactiva la selección automática de Google en el navegador, sin cerrar la cuenta de Google del usuario.
 
 Pruebas: `node --test`. La suite de Google simula el proveedor y la persistencia; la verificación completa con una cuenta real se realiza en el navegador. La carpeta `test/` sigue excluida de Git por la configuración existente.
+
+## Reservas propias
+
+Las tres operaciones requieren una sesión válida en la cookie HttpOnly `goplan_session`. Para las escrituras, enviá `Content-Type: application/json`. Si la solicitud incluye `Origin`, debe coincidir con `APP_ORIGIN`.
+
+| Método y ruta | Entrada | Respuesta exitosa |
+| --- | --- | --- |
+| `GET /api/reservas` | Sin cuerpo | `200` con el historial propio, incluidas las canceladas |
+| `POST /api/reservas` | `{"actividadId":"507f1f77bcf86cd799439012"}` | `201` con la reserva confirmada |
+| `PATCH /api/reservas/{id}/cancelar` | ID de reserva en la ruta y cuerpo `{}` | `200` con la reserva cancelada |
+
+Los identificadores de entrada son cadenas hexadecimales de 24 caracteres. El alta admite únicamente `actividadId`. La identidad proviene de la sesión y el servidor genera las fechas y el estado. La respuesta incluye `id`, `actividadId`, `actividad`, `fechaActividad`, `ubicacion`, `fechaReserva` y `estado`. Al cancelar agrega `fechaCancelacion`. Las fechas se devuelven en ISO 8601.
+
+- `400` indica una entrada inválida o campos adicionales. `401` indica que falta una sesión válida. `403` indica un origen no permitido. `413` indica que el cuerpo supera el límite de 16 KiB. `415` indica que la escritura requiere JSON.
+- `404` indica que la actividad no existe o que la reserva no existe o pertenece a otra persona.
+- `409` indica que la actividad ya comenzó, no quedan cupos, ya hay una reserva confirmada para esa actividad o faltan menos de 12 horas para el inicio.
+- `500` devuelve un mensaje genérico. Si la reserva ya está cancelada, repetir la solicitud devuelve el mismo registro sin devolver otro cupo.
+
+La reserva conserva el nombre, la fecha y la ubicación registrados al crearla. Las ediciones de nombre y ubicación se aplican a futuras reservas. Mientras haya reservas confirmadas se bloquean el borrado de la actividad y los cambios efectivos en su fecha de inicio. Se admite reenviar la misma fecha, incluso con otro desplazamiento horario. Cuando la ocupación llega a cero se permite reprogramar o eliminar la actividad y se conserva el historial. El cupo total siempre debe ser mayor o igual a la ocupación.
+
+El arranque conserva los índices existentes de `reservas`. El índice único parcial impide duplicar reservas confirmadas y las transacciones actualizan el registro y la ocupación juntos. El servidor de MongoDB debe admitir transacciones, como un replica set o Atlas. Los registros existentes conservan su formato y no requieren una migración para este cambio.
+
+Para ejecutar las pruebas de integración, configurá `MONGODB_TEST_URI` con un replica set local y ejecutá `node --test tests/reservas.test.js`. Por ejemplo, `mongodb://127.0.0.1:27017/?replicaSet=rs0`. La prueba crea una base aislada de nombre aleatorio y la elimina al finalizar. Sin esa variable, `npm test` ejecuta las pruebas disponibles y omite la integración con MongoDB.

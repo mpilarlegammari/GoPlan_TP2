@@ -1,97 +1,82 @@
 import { ObjectId } from 'mongodb'
 import CnxMongoDB from './CnxMongoDB.js'
+import ErrorReserva from '../../errores/ErrorReserva.js'
 
-export const ANTICIPACION_MS = 12 * 60 * 60 * 1000
+class ReservasMongoDB {
+    #validarConexion() {
+        if (!CnxMongoDB.connectionOK || !CnxMongoDB.db || !CnxMongoDB.client) {
+            throw new Error('Error de conexión a base de datos')
+        }
+    }
 
-export function errorReserva(status, mensaje) {
-    return Object.assign(new Error(mensaje), { status })
-}
+    async preparar() {
+        this.#validarConexion()
+        const reservas = CnxMongoDB.db.collection('reservas')
+        await reservas.createIndex({ usuarioId: 1, actividadId: 1 }, {
+            unique: true,
+            partialFilterExpression: { estado: 'confirmada' }
+        })
+        await reservas.createIndex({ usuarioId: 1, fechaReserva: -1 })
+    }
 
-export async function prepararReservas() {
-    const reservas = CnxMongoDB.db.collection('reservas')
-    await reservas.createIndex({ usuarioId: 1, actividadId: 1 }, {
-        unique: true,
-        partialFilterExpression: { estado: 'confirmada' }
-    })
-    await reservas.createIndex({ usuarioId: 1, fechaReserva: -1 })
-}
+    async listar(usuarioId) {
+        this.#validarConexion()
+        return CnxMongoDB.db.collection('reservas')
+            .find({ usuarioId: new ObjectId(usuarioId) }).sort({ fechaReserva: -1 }).toArray()
+    }
 
-export function listarReservas(usuarioId) {
-    return CnxMongoDB.db.collection('reservas')
-        .find({ usuarioId }).sort({ fechaReserva: -1 }).toArray()
-}
+    async crear(actividadId, prepararReserva) {
+        this.#validarConexion()
+        const reservas = CnxMongoDB.db.collection('reservas')
+        const actividades = CnxMongoDB.db.collection('actividades')
+        const id = new ObjectId(actividadId)
+        try {
+            return await CnxMongoDB.client.withSession((session) => session.withTransaction(async () => {
+                const actividad = await actividades.findOne({ _id: id }, { session })
+                const datos = prepararReserva(actividad)
+                const reserva = { ...datos, usuarioId: new ObjectId(datos.usuarioId), actividadId: id }
+                const resultado = await actividades.updateOne({
+                    _id: id,
+                    $expr: { $lt: [{ $ifNull: ['$cuposReservados', 0] }, '$cupo'] }
+                }, { $inc: { cuposReservados: 1 } }, { session })
+                if (!resultado.modifiedCount) throw new ErrorReserva(409, 'No quedan cupos disponibles')
 
-export async function crearReserva(usuarioId, actividadId) {
-    const reservas = CnxMongoDB.db.collection('reservas')
-    const actividades = CnxMongoDB.db.collection('actividades')
-
-    try {
-        return await CnxMongoDB.client.withSession((session) => session.withTransaction(async () => {
-            const ahora = new Date()
-            const actividad = await actividades.findOne({ _id: actividadId }, { session })
-            if (!actividad) throw errorReserva(404, 'Actividad inexistente')
-
-            const fechaActividad = new Date(actividad.fechaInicio)
-            if (!Number.isFinite(fechaActividad.getTime()) || fechaActividad <= ahora) {
-                throw errorReserva(409, 'La actividad ya no admite reservas')
+                const { insertedId } = await reservas.insertOne(reserva, { session })
+                return { ...reserva, _id: insertedId }
+            }))
+        } catch (error) {
+            if (error.code === 11000) {
+                throw new ErrorReserva(409, 'Ya tenés una reserva confirmada para esta actividad')
             }
+            throw error
+        }
+    }
 
-            const reserva = {
-                _id: new ObjectId(),
-                usuarioId,
-                actividadId,
-                actividad: actividad.nombre,
-                fechaActividad,
-                ubicacion: [
-                    actividad.ubicacion?.direccion,
-                    actividad.ubicacion?.ciudad?.nombre,
-                    actividad.ubicacion?.provincia?.nombre
-                ].filter(Boolean).join(', '),
-                fechaReserva: ahora,
-                estado: 'confirmada'
+    async cancelar(usuarioId, reservaId, prepararCancelacion) {
+        this.#validarConexion()
+        const reservas = CnxMongoDB.db.collection('reservas')
+        const actividades = CnxMongoDB.db.collection('actividades')
+        const filtro = { _id: new ObjectId(reservaId), usuarioId: new ObjectId(usuarioId) }
+        return CnxMongoDB.client.withSession((session) => session.withTransaction(async () => {
+            const reserva = await reservas.findOne(filtro, { session })
+            const actividad = reserva && await actividades.findOne({ _id: reserva.actividadId }, { session })
+            const cambios = prepararCancelacion(reserva, actividad)
+            if (!cambios) return reserva
+
+            if (actividad) {
+                const resultado = await actividades.updateOne(
+                    { _id: reserva.actividadId, cuposReservados: { $gt: 0 } },
+                    { $inc: { cuposReservados: -1 } }, { session }
+                )
+                if (!resultado.modifiedCount) throw new Error('El contador de cupos es inconsistente')
             }
-
-            await reservas.insertOne(reserva, { session })
-            const resultado = await actividades.updateOne({
-                _id: actividadId,
-                $expr: { $lt: [{ $ifNull: ['$cuposReservados', 0] }, '$cupo'] }
-            }, { $inc: { cuposReservados: 1 } }, { session })
-            if (!resultado.modifiedCount) throw errorReserva(409, 'No quedan cupos disponibles')
-            return reserva
+            const resultado = await reservas.updateOne(
+                { ...filtro, estado: 'confirmada' }, { $set: cambios }, { session }
+            )
+            if (!resultado.modifiedCount) throw new Error('No se pudo cambiar el estado de la reserva')
+            return { ...reserva, ...cambios }
         }))
-    } catch (error) {
-        if (error.code === 11000) throw errorReserva(409, 'Ya tenés una reserva confirmada para esta actividad')
-        throw error
     }
 }
 
-export async function cancelarReserva(usuarioId, reservaId) {
-    const reservas = CnxMongoDB.db.collection('reservas')
-    const actividades = CnxMongoDB.db.collection('actividades')
-
-    return CnxMongoDB.client.withSession((session) => session.withTransaction(async () => {
-        const filtro = { _id: reservaId, usuarioId }
-        const reserva = await reservas.findOne(filtro, { session })
-        if (!reserva) throw errorReserva(404, 'Reserva inexistente')
-        if (reserva.estado === 'cancelada') return reserva
-
-        const actividad = await actividades.findOne({ _id: reserva.actividadId }, { session })
-        const ahora = new Date()
-        const inicio = new Date(actividad?.fechaInicio ?? reserva.fechaActividad).getTime()
-        if (!Number.isFinite(inicio) || inicio - ahora.getTime() < ANTICIPACION_MS) {
-            throw errorReserva(409, 'La cancelación requiere al menos 12 horas de anticipación')
-        }
-
-        if (actividad) {
-            const resultado = await actividades.updateOne(
-                { _id: reserva.actividadId, cuposReservados: { $gt: 0 } },
-                { $inc: { cuposReservados: -1 } },
-                { session }
-            )
-            if (!resultado.modifiedCount) throw new Error('El contador de cupos es inconsistente')
-        }
-        const cambios = { estado: 'cancelada', fechaCancelacion: ahora }
-        await reservas.updateOne({ ...filtro, estado: 'confirmada' }, { $set: cambios }, { session })
-        return { ...reserva, ...cambios }
-    }))
-}
+export default ReservasMongoDB

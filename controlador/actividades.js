@@ -35,7 +35,8 @@ class Controlador{
             }
             catch(error) {
                 const status = error.isJoi ? 400 : error.status || 500
-                res.status(status).json({ url: req.url, method: req.method, error: error.message })
+                const mensaje = status === 500 ? 'No se pudo modificar la actividad' : error.message
+                res.status(status).json({ url: req.url, method: req.method, error: mensaje })
             }
     }
 
@@ -51,7 +52,9 @@ class Controlador{
                 res.status(204).end()
             }
             catch(error) {
-                res.status(500).json({ url: req.url, method: req.method, error: error.message })
+                const status = error.status || 500
+                const mensaje = status === 500 ? 'No se pudo eliminar la actividad' : error.message
+                res.status(status).json({ url: req.url, method: req.method, error: mensaje })
             }
     }
 
