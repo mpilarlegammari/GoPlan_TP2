@@ -6,11 +6,20 @@ import ErrorReserva from '../errores/ErrorReserva.js'
 const ANTICIPACION_MS = 12 * 60 * 60 * 1000
 
 function presentar(reserva) {
-    const { _id, actividadId, actividad, fechaActividad, ubicacion, fechaReserva,
-        estado, fechaCancelacion } = reserva
+    const { _id, actividadId, datosActividad, fechaReserva, estado, fechaCancelacion } = reserva
+    const ubicacion = datosActividad?.ubicacion
     return {
-        id: _id.toString(), actividadId: actividadId.toString(), actividad, fechaActividad,
-        ubicacion, fechaReserva, estado, ...(fechaCancelacion && { fechaCancelacion })
+        id: _id.toString(),
+        actividadId: actividadId.toString(),
+        actividad: datosActividad?.nombre ?? reserva.actividad ?? 'Actividad eliminada',
+        fechaActividad: datosActividad?.fechaInicio ?? reserva.fechaActividad ?? null,
+        ubicacion: datosActividad
+            ? [ubicacion?.direccion, ubicacion?.ciudad?.nombre, ubicacion?.provincia?.nombre]
+                .filter(Boolean).join(', ')
+            : reserva.ubicacion ?? 'No disponible',
+        fechaReserva,
+        estado,
+        ...(fechaCancelacion && { fechaCancelacion })
     }
 }
 
@@ -37,12 +46,6 @@ class ServicioReservas {
             const modelo = new Reserva({
                 usuarioId: propietario,
                 actividadId,
-                actividad: actividad.nombre,
-                fechaActividad,
-                ubicacion: [
-                    actividad.ubicacion?.direccion, actividad.ubicacion?.ciudad?.nombre,
-                    actividad.ubicacion?.provincia?.nombre
-                ].filter(Boolean).join(', '),
                 fechaReserva: ahora
             })
             modelo.validar()
@@ -59,7 +62,7 @@ class ServicioReservas {
             if (actual.estado === 'cancelada') return null
 
             const ahora = new Date()
-            const inicio = new Date(actividad?.fechaInicio ?? actual.fechaActividad).getTime()
+            const inicio = new Date(actividad?.fechaInicio).getTime()
             if (!Number.isFinite(inicio) || inicio - ahora.getTime() < ANTICIPACION_MS) {
                 throw new ErrorReserva(409, 'La cancelación requiere al menos 12 horas de anticipación')
             }

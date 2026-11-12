@@ -22,7 +22,17 @@ class ReservasMongoDB {
     async listar(usuarioId) {
         this.#validarConexion()
         return CnxMongoDB.db.collection('reservas')
-            .find({ usuarioId: new ObjectId(usuarioId) }).sort({ fechaReserva: -1 }).toArray()
+            .aggregate([
+                { $match: { usuarioId: new ObjectId(usuarioId) } },
+                { $sort: { fechaReserva: -1 } },
+                { $lookup: {
+                    from: 'actividades',
+                    localField: 'actividadId',
+                    foreignField: '_id',
+                    as: 'datosActividad'
+                } },
+                { $unwind: { path: '$datosActividad', preserveNullAndEmptyArrays: true } }
+            ]).toArray()
     }
 
     async crear(actividadId, prepararReserva) {
@@ -42,7 +52,7 @@ class ReservasMongoDB {
                 if (!resultado.modifiedCount) throw new ErrorReserva(409, 'No quedan cupos disponibles')
 
                 const { insertedId } = await reservas.insertOne(reserva, { session })
-                return { ...reserva, _id: insertedId }
+                return { ...reserva, _id: insertedId, datosActividad: actividad }
             }))
         } catch (error) {
             if (error.code === 11000) {
@@ -61,7 +71,7 @@ class ReservasMongoDB {
             const reserva = await reservas.findOne(filtro, { session })
             const actividad = reserva && await actividades.findOne({ _id: reserva.actividadId }, { session })
             const cambios = prepararCancelacion(reserva, actividad)
-            if (!cambios) return reserva
+            if (!cambios) return { ...reserva, datosActividad: actividad }
 
             if (actividad) {
                 const resultado = await actividades.updateOne(
@@ -74,7 +84,7 @@ class ReservasMongoDB {
                 { ...filtro, estado: 'confirmada' }, { $set: cambios }, { session }
             )
             if (!resultado.modifiedCount) throw new Error('No se pudo cambiar el estado de la reserva')
-            return { ...reserva, ...cambios }
+            return { ...reserva, ...cambios, datosActividad: actividad }
         }))
     }
 }

@@ -1579,7 +1579,8 @@
           },
           "fechaActividad": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "nullable": true
           },
           "ubicacion": {
             "type": "string"
@@ -1600,7 +1601,7 @@
             "format": "date-time"
           }
         },
-        "description": "Nombre, fecha y ubicación registrados al reservar. fechaCancelacion aparece al cancelar."
+        "description": "Nombre, fecha y ubicación consultados mediante actividadId. Si se elimina la actividad, se usa la copia de los registros antiguos cuando existe. En los demás casos se muestra Actividad eliminada y fechaActividad es null. fechaCancelacion aparece al cancelar."
       }
     }
   }

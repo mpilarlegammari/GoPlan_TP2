@@ -7,9 +7,6 @@ const cancelacion = Joi.object({ reservaId: id, cuerpo: Joi.object().max(0).unkn
 const documento = Joi.object({
     usuarioId: id,
     actividadId: id,
-    actividad: Joi.string().trim().required(),
-    fechaActividad: Joi.date().required(),
-    ubicacion: Joi.string().trim().allow('').required(),
     fechaReserva: Joi.date().required(),
     estado: Joi.string().valid('confirmada', 'cancelada').required(),
     fechaCancelacion: Joi.when('estado', {
