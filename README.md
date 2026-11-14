@@ -156,7 +156,7 @@ Content-Type: application/json
 
 ## Actividades
 
-CRUD público en el estado actual.
+La consulta, el alta y la edición son públicas en el estado actual. El borrado requiere una sesión de administrador.
 
 <details>
 <summary><strong>GET</strong> <code>/api/actividades</code> — Listar actividades</summary>
@@ -443,15 +443,9 @@ Content-Type: application/json
 <details>
 <summary><strong>DELETE</strong> <code>/api/actividades/{id}</code> — Eliminar actividad</summary>
 
-Acceso público. Eliminación del documento.
+Elimina la actividad y cancela sus reservas confirmadas en una misma transacción. Las reservas canceladas por el borrado conservan los datos de la actividad para el historial y el comprobante.
 
-**Autenticación:** no requiere sesión.
-
-**Parameters**
-
-| Nombre | Ubicación | Obligatorio | Descripción | Ejemplo |
-|---|---|---|---|---|
-| `id` | path | Sí | ObjectId devuelto al crear o listar una actividad. | `507f1f77bcf86cd799439012` |
+**Autenticación:** requiere la cookie `goplan_session` de un administrador y, si se envía `Origin`, debe coincidir con `APP_ORIGIN`.
 
 **Request**
 
@@ -466,6 +460,8 @@ DELETE http://localhost:8080/api/actividades/507f1f77bcf86cd799439012
 | Code | Description |
 |---|---|
 | `204` | Eliminada. Sin cuerpo. |
+| `401` | Sesión ausente o inválida. |
+| `403` | Rol u origen no autorizado. |
 | `404` | Actividad no encontrada o ID inválido. |
 | `500` | Error de persistencia. |
 
@@ -676,6 +672,11 @@ Las tres operaciones requieren una sesión válida en la cookie HttpOnly `goplan
 | `GET /api/reservas` | Sin cuerpo | `200` con el historial propio, incluidas las canceladas |
 | `POST /api/reservas` | `{"actividadId":"507f1f77bcf86cd799439012"}` | `201` con la reserva confirmada |
 | `PATCH /api/reservas/{id}/cancelar` | ID de reserva en la ruta y cuerpo `{}` | `200` con la reserva cancelada |
+| `GET /api/reservas/{id}/comprobante` | ID de una reserva propia | `200` con un PDF descargable |
+
+El comprobante se genera en Node con PDFKit e incluye la actividad, su fecha y ubicación, el nombre y apellido del titular y el estado de la reserva.
+Un ID inválido devuelve `400`, una sesión ausente o inválida devuelve `401`
+y una reserva inexistente o ajena devuelve `404`.
 
 Los identificadores de entrada son cadenas hexadecimales de 24 caracteres. El alta admite únicamente `actividadId`. La identidad proviene de la sesión y el servidor genera las fechas y el estado. La respuesta incluye `id`, `actividadId`, `actividad`, `fechaActividad`, `ubicacion`, `fechaReserva` y `estado`. Al cancelar agrega `fechaCancelacion`. Las fechas se devuelven en ISO 8601.
 
@@ -684,7 +685,7 @@ Los identificadores de entrada son cadenas hexadecimales de 24 caracteres. El al
 - `409` indica que la actividad ya comenzó, no quedan cupos, ya hay una reserva confirmada para esa actividad o faltan menos de 12 horas para el inicio.
 - `500` devuelve un mensaje genérico. Si la reserva ya está cancelada, repetir la solicitud devuelve el mismo registro sin devolver otro cupo.
 
-Las reservas nuevas guardan solo `actividadId` como referencia a la actividad. La API consulta el nombre, la fecha y la ubicación vigentes al preparar la respuesta. Si se elimina la actividad, la reserva sigue en el historial. Si un registro anterior tiene una copia de los datos, la API la usa en ese caso. Para las reservas sin copia, devuelve `actividad: "Actividad eliminada"`, `fechaActividad: null` y `ubicacion: "No disponible"`. Mientras haya reservas confirmadas se bloquean el borrado de la actividad y los cambios efectivos en su fecha de inicio. Se admite reenviar la misma fecha, incluso con otro desplazamiento horario. Cuando la ocupación llega a cero se permite reprogramar o eliminar la actividad. El cupo total siempre debe ser mayor o igual a la ocupación.
+Las reservas nuevas guardan `actividadId` como referencia. La API consulta el nombre, la fecha y la ubicación vigentes al preparar la respuesta. El borrado cancela las reservas confirmadas, conserva su historial y guarda los últimos datos de la actividad en esas reservas. Las reservas previamente canceladas conservan su estado y fecha original. Si la actividad ya no existe y una reserva carece de copia, la API devuelve `actividad: "Actividad eliminada"`, `fechaActividad: null` y `ubicacion: "No disponible"`. Los cambios efectivos de fecha siguen bloqueados mientras haya reservas confirmadas. El cupo total siempre debe ser mayor o igual a la ocupación.
 
 El arranque conserva los índices existentes de `reservas`. El índice único parcial impide duplicar reservas confirmadas y las transacciones actualizan el registro y la ocupación juntos. El servidor de MongoDB debe admitir transacciones, como un replica set o Atlas. Los registros existentes pueden leerse sin migración.
 

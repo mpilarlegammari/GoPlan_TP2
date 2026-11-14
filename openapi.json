@@ -645,7 +645,8 @@
             "example": "507f1f77bcf86cd799439012"
           }
         ],
-        "description": "Acceso público. Eliminación del documento.",
+        "description": "Requiere rol admin. Elimina la actividad y cancela sus reservas confirmadas en una transacción.",
+        "security": [{ "cookieAuth": [] }],
         "responses": {
           "204": {
             "description": "Eliminada. Sin cuerpo."
@@ -660,16 +661,8 @@
               }
             }
           },
-          "409": {
-            "description": "La actividad tiene reservas confirmadas.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
+          "401": { "description": "Sesión ausente o inválida." },
+          "403": { "description": "Rol u origen no autorizado." },
           "500": {
             "description": "Error de persistencia.",
             "content": {
@@ -1194,6 +1187,29 @@
               }
             }
           }
+        }
+      }
+    },
+    "/api/reservas/{id}/comprobante": {
+      "get": {
+        "tags": ["Reservas"],
+        "summary": "Descargar el comprobante de una reserva propia",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [{
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": { "type": "string", "pattern": "^[0-9a-fA-F]{24}$" }
+        }],
+        "responses": {
+          "200": {
+            "description": "Comprobante descargable",
+            "content": { "application/pdf": { "schema": { "type": "string", "format": "binary" } } }
+          },
+          "400": { "description": "Identificador inválido" },
+          "401": { "description": "Sesión ausente o inválida" },
+          "404": { "description": "Reserva inexistente o ajena" },
+          "500": { "description": "Error al generar el comprobante" }
         }
       }
     },

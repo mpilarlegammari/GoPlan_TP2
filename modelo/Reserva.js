@@ -29,6 +29,10 @@ class Reserva {
         return validarEntrada(id, usuarioId)
     }
 
+    static validarId(reservaId) {
+        return validarEntrada(id, reservaId)
+    }
+
     static validarAlta(datos) {
         return validarEntrada(alta, datos)
     }

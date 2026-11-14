@@ -30,6 +30,14 @@ class ServicioReservas {
         return (await this.#dao.listar(Reserva.validarUsuario(usuarioId))).map(presentar)
     }
 
+    async obtenerPropia(usuarioId, reservaId) {
+        const reserva = await this.#dao.obtenerPropia(
+            Reserva.validarUsuario(usuarioId), Reserva.validarId(reservaId)
+        )
+        if (!reserva) throw new ErrorReserva(404, 'Reserva inexistente')
+        return presentar(reserva)
+    }
+
     async crear(usuarioId, datos) {
         const propietario = Reserva.validarUsuario(usuarioId)
         const { actividadId } = Reserva.validarAlta(datos)

@@ -19,11 +19,11 @@ class ReservasMongoDB {
         await reservas.createIndex({ usuarioId: 1, fechaReserva: -1 })
     }
 
-    async listar(usuarioId) {
+    #consultar(filtro) {
         this.#validarConexion()
         return CnxMongoDB.db.collection('reservas')
             .aggregate([
-                { $match: { usuarioId: new ObjectId(usuarioId) } },
+                { $match: filtro },
                 { $sort: { fechaReserva: -1 } },
                 { $lookup: {
                     from: 'actividades',
@@ -33,6 +33,18 @@ class ReservasMongoDB {
                 } },
                 { $unwind: { path: '$datosActividad', preserveNullAndEmptyArrays: true } }
             ]).toArray()
+    }
+
+    listar(usuarioId) {
+        return this.#consultar({ usuarioId: new ObjectId(usuarioId) })
+    }
+
+    async obtenerPropia(usuarioId, reservaId) {
+        const [reserva] = await this.#consultar({
+            usuarioId: new ObjectId(usuarioId),
+            _id: new ObjectId(reservaId)
+        })
+        return reserva
     }
 
     async crear(actividadId, prepararReserva) {

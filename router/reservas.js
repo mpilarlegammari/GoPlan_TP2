@@ -11,6 +11,7 @@ router.use((_req, res, next) => {
 })
 router.use(autenticar())
 router.get('/', controlador.listar)
+router.get('/:id/comprobante', controlador.descargarComprobante)
 router.post('/', protegerOrigen, controlador.crear)
 router.patch('/:id/cancelar', protegerOrigen, controlador.cancelar)
 router.use(manejarErrorReserva)

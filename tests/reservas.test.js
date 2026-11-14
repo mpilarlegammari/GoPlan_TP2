@@ -13,6 +13,24 @@ import ReservasFactory from '../modelo/DAO/reservasFactory.js'
 import RouterActividades from '../router/actividades.js'
 import routerReservas from '../router/reservas.js'
 import { manejarErrorReserva } from '../controlador/reservas.js'
+import generarComprobanteReserva from '../servicio/comprobanteReserva.js'
+
+test('Genera un PDF para una reserva sin actividad disponible', async () => {
+    const pdf = await generarComprobanteReserva({
+        id: new ObjectId().toHexString(),
+        actividad: 'Actividad eliminada',
+        fechaActividad: null,
+        fechaReserva: new Date(),
+        estado: 'cancelada',
+        fechaCancelacion: new Date()
+    }, { nombre: 'Ana', apellido: 'Pérez' }, { compress: false })
+    assert.equal(pdf.subarray(0, 5).toString(), '%PDF-')
+    const texto = [...pdf.toString('latin1').matchAll(/\[([^\r\n]+)\] TJ/g)]
+        .map(([, linea]) => [...linea.matchAll(/<([a-f0-9]+)>/gi)]
+            .map(([, hex]) => Buffer.from(hex, 'hex').toString('latin1')).join(''))
+    assert.ok(texto.includes('Titular: Ana Pérez'))
+    assert.match(pdf.subarray(-20).toString(), /%%EOF/)
+})
 
 test('Reserva valida la entrada y rechaza campos internos', () => {
     const id = new ObjectId().toHexString()
@@ -46,7 +64,8 @@ test('Reservas HTTP con transacciones reales', { skip: !uri }, async (t) => {
 
     const usuarios = [new ObjectId(), new ObjectId()]
     await db.collection('usuarios').insertMany(usuarios.map((_id, i) => ({
-        _id, nombre: 'Usuario de prueba', email: 'usuario' + i + '@example.com', rol: 'usuario', activo: true
+        _id, nombre: 'Usuario de prueba', email: 'usuario' + i + '@example.com',
+        rol: i === 0 ? 'admin' : 'usuario', activo: true
     })))
     const actividades = db.collection('actividades')
     const reservas = db.collection('reservas')
@@ -114,6 +133,15 @@ test('Reservas HTTP con transacciones reales', { skip: !uri }, async (t) => {
         assert.equal(reserva.actividad, 'Actividad de prueba')
         assert.equal(reserva.fechaActividad, futuro.toISOString())
         assert.equal(reserva.estado, 'confirmada')
+        const rutaComprobante = '/reservas/' + reserva.id + '/comprobante'
+        assert.equal((await llamar(rutaComprobante, { usuario: null })).status, 401)
+        assert.equal((await llamar(rutaComprobante, { usuario: 1 })).status, 404)
+        assert.equal((await llamar('/reservas/invalida/comprobante')).status, 400)
+        const comprobante = await llamar(rutaComprobante)
+        assert.equal(comprobante.status, 200)
+        assert.match(comprobante.headers.get('content-type'), /^application\/pdf/)
+        assert.match(comprobante.headers.get('content-disposition'), /^attachment;/)
+        assert.equal(Buffer.from(await comprobante.arrayBuffer()).subarray(0, 5).toString(), '%PDF-')
         assert.equal(Object.hasOwn(reserva, 'usuarioId'), false)
         const guardada = await reservas.findOne({
             _id: new ObjectId(reserva.id), usuarioId: usuarios[0], actividadId: new ObjectId(actividadId)
@@ -164,11 +192,19 @@ test('Reservas HTTP con transacciones reales', { skip: !uri }, async (t) => {
         const nuevaFecha = new Date(futuro.getTime() + 86400000).toISOString()
         assert.equal((await editar({ fechaInicio: nuevaFecha })).status, 409)
         assert.equal((await editar({ fechaInicio: 'inválida' })).status, 400)
-        assert.equal((await borrar()).status, 409)
         assert.equal((await cancelar(id)).status, 200)
         assert.equal((await editar({ fechaInicio: nuevaFecha })).status, 200)
         assert.equal((await historial()).fechaActividad, nuevaFecha)
+        const { id: activa } = await (await alta(actividadId, 1)).json()
+        assert.equal((await llamar(ruta, { method: 'DELETE', usuario: null })).status, 401)
+        assert.equal((await llamar(ruta, { method: 'DELETE', usuario: 1 })).status, 403)
         assert.equal((await borrar()).status, 204)
+        assert.equal(await documento(actividadId), null)
+        const historialAjeno = await (await llamar('/reservas', { usuario: 1 })).json()
+        const canceladaPorBorrado = historialAjeno.find((reserva) => reserva.id === activa)
+        assert.equal(canceladaPorBorrado.estado, 'cancelada')
+        assert.equal(canceladaPorBorrado.actividad, 'Nombre nuevo')
+        assert.ok(canceladaPorBorrado.fechaCancelacion)
         const cancelada = await historial()
         assert.equal(cancelada.actividad, 'Actividad eliminada')
         assert.equal(cancelada.fechaActividad, null)

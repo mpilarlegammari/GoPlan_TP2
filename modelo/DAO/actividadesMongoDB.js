@@ -89,16 +89,25 @@ class ModeloMongoDB{
 
         const actividades = CnxMongoDB.db.collection('actividades')
         const _id = new ObjectId(id)
-        const resultado = await actividades.deleteOne({
-            _id,
-            $expr: { $eq: [{ $ifNull: ['$cuposReservados', 0] }, 0] }
-        })
-        if (!resultado.deletedCount && await actividades.findOne({ _id })) {
-            throw Object.assign(new Error('No se puede eliminar una actividad con reservas confirmadas'), {
-                status: 409
-            })
-        }
-        return resultado.deletedCount > 0
+        return CnxMongoDB.client.withSession((session) => session.withTransaction(async () => {
+            const actividad = await actividades.findOneAndDelete({ _id }, { session })
+            if (!actividad) return false
+
+            const ubicacion = actividad.ubicacion
+            await CnxMongoDB.db.collection('reservas').updateMany(
+                { actividadId: _id, estado: 'confirmada' },
+                { $set: {
+                    estado: 'cancelada',
+                    fechaCancelacion: new Date(),
+                    actividad: actividad.nombre,
+                    fechaActividad: actividad.fechaInicio,
+                    ubicacion: [ubicacion?.direccion, ubicacion?.ciudad?.nombre, ubicacion?.provincia?.nombre]
+                        .filter(Boolean).join(', ')
+                } },
+                { session }
+            )
+            return true
+        }))
     }
 }
 

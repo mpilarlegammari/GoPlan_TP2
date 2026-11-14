@@ -1,11 +1,19 @@
 import ServicioReservas from '../servicio/reservas.js'
 import ErrorReserva from '../errores/ErrorReserva.js'
+import generarComprobanteReserva from '../servicio/comprobanteReserva.js'
 
 class ControladorReservas {
     #servicio = new ServicioReservas()
 
     listar = async (req, res) => {
         res.json(await this.#servicio.listar(req.usuario._id.toString()))
+    }
+
+    descargarComprobante = async (req, res) => {
+        const { _id, nombre, apellido } = req.usuario
+        const reserva = await this.#servicio.obtenerPropia(_id.toString(), req.params.id)
+        const pdf = await generarComprobanteReserva(reserva, { nombre, apellido })
+        res.attachment(`reserva-${reserva.id}.pdf`).send(pdf)
     }
 
     crear = async (req, res) => {

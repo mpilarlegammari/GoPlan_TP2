@@ -107,7 +107,9 @@ async function cargarActividades() {
             agregarTexto(item, 'p', actividad.descripcion)
             agregarTexto(item, 'p', `Categoría: ${actividad.categoria || 'Sin categoría'}`)
             agregarTexto(item, 'p', `Fecha: ${new Date(actividad.fechaInicio).toLocaleString('es-AR')}`)
-            agregarTexto(item, 'p', `Cupo: ${actividad.cupo} | Precio: ${Number(actividad.precio).toLocaleString('es-AR', { style: 'currency', currency: 'ARS' })}`)
+            const disponibles = Math.max(0, actividad.cupo - (actividad.cuposReservados ?? 0))
+            const disponibilidad = disponibles === 0 ? 'Sin cupos' : `Cupos disponibles: ${disponibles}`
+            agregarTexto(item, 'p', `${disponibilidad} | Precio: ${Number(actividad.precio).toLocaleString('es-AR', { style: 'currency', currency: 'ARS' })}`)
             agregarTexto(item, 'p', [ubicacion?.direccion, ubicacion?.ciudad?.nombre, ubicacion?.provincia?.nombre, ubicacion?.pais?.nombre].filter(Boolean).join(', '))
             lista.append(item)
         }
