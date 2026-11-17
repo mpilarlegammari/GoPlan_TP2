@@ -14,6 +14,6 @@ try {
     new Server(config.PORT).start()
 } catch (error) {
     await CnxMongoDB.desconectar()
-    console.error('No se pudo iniciar el servidor; revisar conexión, datos e índices de MongoDB')
+    console.error('No se pudo iniciar el servidor:', error instanceof Error ? error.message : error)
     process.exitCode = 1
 }

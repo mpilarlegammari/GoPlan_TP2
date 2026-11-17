@@ -21,6 +21,9 @@ class CnxMongoDB {
         }
         catch(error) {
             await CnxMongoDB.desconectar()
+            const mensaje = error instanceof Error ? error.message : String(error)
+            const mensajeSeguro = mensaje.replace(/mongodb(?:\+srv)?:\/\/[^\s"'<>]+/gi, '[URI de MongoDB oculta]')
+            console.error(`Error al conectar a MongoDB (${error?.name || 'Error'}): ${mensajeSeguro}`)
             throw new Error('No se pudo conectar a MongoDB; revisar la configuración y disponibilidad')
         }
     }

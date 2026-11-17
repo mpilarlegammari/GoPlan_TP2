@@ -3,7 +3,10 @@ import { randomBytes } from 'node:crypto'
 
 dotenv.config({quiet: true})
 
-const PORT = 8080
+const PORT = process.env.PORT === undefined ? 8080 : Number(process.env.PORT)
+if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
+    throw new Error('PORT debe ser un número entero entre 1 y 65535')
+}
 const CSC_API_KEY = process.env.CSC_API_KEY
 const MODO_PERSISTENCIA = process.env.MODO_PERSISTENCIA || ''
 const STRCNX = process.env.STRCNX || 'mongodb://localhost:27017'
