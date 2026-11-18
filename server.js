@@ -2,15 +2,16 @@ import express from 'express'
 import RouterActividades from './router/actividades.js'
 import RouterUbicaciones from './router/ubicaciones.js'
 import RouterAuth from './router/auth.js'
-import routerUsuarios from './router/usuarios.js'
-import routerReservas from './router/reservas.js'
-import { manejarErrorReserva } from './controlador/reservas.js'
+import RouterUsuarios from './router/usuarios.js'
+import RouterReservas from './router/reservas.js'
 import cookieParser from 'cookie-parser'
 
 
 class Server {
     #port = null
     #RouterActividades = null
+    #RouterUsuarios = new RouterUsuarios()
+    #RouterReservas = new RouterReservas()
     #RouterUbicaciones = null
 
     constructor(port) {
@@ -30,9 +31,9 @@ class Server {
 
         app.use('/api/actividades', this.#RouterActividades.config())
         app.use('/api/ubicaciones', this.#RouterUbicaciones.config())
-        app.use('/api/usuarios', routerUsuarios)
+        app.use('/api/usuarios', this.#RouterUsuarios.config())
         app.use('/api/auth', new RouterAuth().config())
-        app.use('/api/reservas', routerReservas, manejarErrorReserva)
+        app.use('/api/reservas', this.#RouterReservas.config(), this.#RouterReservas.manejarError)
 
         const server = app.listen(this.#port, () => console.log(`Servidor ApiRestful escuchando en http://localhost:${this.#port}`))
         server.on('error', error => console.log(`Error en servidor: ${error.message}`))

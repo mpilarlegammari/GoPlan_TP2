@@ -1,55 +1,54 @@
 import Reserva from '../modelo/Reserva.js'
 import ReservasFactory from '../modelo/DAO/reservasFactory.js'
 import config from '../config.js'
-import ErrorReserva from '../errores/ErrorReserva.js'
 
 const ANTICIPACION_MS = 12 * 60 * 60 * 1000
 
-function presentar(reserva) {
-    const { _id, actividadId, datosActividad, fechaReserva, estado, fechaCancelacion } = reserva
-    const ubicacion = datosActividad?.ubicacion
-    return {
-        id: _id.toString(),
-        actividadId: actividadId.toString(),
-        actividad: datosActividad?.nombre ?? reserva.actividad ?? 'Actividad eliminada',
-        fechaActividad: datosActividad?.fechaInicio ?? reserva.fechaActividad ?? null,
-        ubicacion: datosActividad
-            ? [ubicacion?.direccion, ubicacion?.ciudad?.nombre, ubicacion?.provincia?.nombre]
-                .filter(Boolean).join(', ')
-            : reserva.ubicacion ?? 'No disponible',
-        fechaReserva,
-        estado,
-        ...(fechaCancelacion && { fechaCancelacion })
-    }
-}
-
 class ServicioReservas {
-    #dao = ReservasFactory.get(config.MODO_PERSISTENCIA)
+    #modelo = ReservasFactory.get(config.MODO_PERSISTENCIA)
 
-    async listar(usuarioId) {
-        return (await this.#dao.listar(Reserva.validarUsuario(usuarioId))).map(presentar)
+    #presentar = reserva => {
+        const { _id, actividadId, datosActividad, fechaReserva, estado, fechaCancelacion } = reserva
+        const ubicacion = datosActividad?.ubicacion
+        return {
+            id: _id.toString(),
+            actividadId: actividadId.toString(),
+            actividad: datosActividad?.nombre ?? reserva.actividad ?? 'Actividad eliminada',
+            fechaActividad: datosActividad?.fechaInicio ?? reserva.fechaActividad ?? null,
+            ubicacion: datosActividad
+                ? [ubicacion?.direccion, ubicacion?.ciudad?.nombre, ubicacion?.provincia?.nombre]
+                    .filter(Boolean).join(', ')
+                : reserva.ubicacion ?? 'No disponible',
+            fechaReserva,
+            estado,
+            ...(fechaCancelacion && { fechaCancelacion })
+        }
     }
 
-    async obtenerPropia(usuarioId, reservaId) {
-        const reserva = await this.#dao.obtenerPropia(
+    listar = async (usuarioId) => {
+        return (await this.#modelo.listar(Reserva.validarUsuario(usuarioId))).map(this.#presentar)
+    }
+
+    obtenerPropia = async (usuarioId, reservaId) => {
+        const reserva = await this.#modelo.obtenerPropia(
             Reserva.validarUsuario(usuarioId), Reserva.validarId(reservaId)
         )
-        if (!reserva) throw new ErrorReserva(404, 'Reserva inexistente')
-        return presentar(reserva)
+        if (!reserva) throw Object.assign(new Error('Reserva inexistente'), { status: 404 })
+        return this.#presentar(reserva)
     }
 
-    async crear(usuarioId, datos) {
+    crear = async (usuarioId, datos) => {
         const propietario = Reserva.validarUsuario(usuarioId)
         const { actividadId } = Reserva.validarAlta(datos)
-        const reserva = await this.#dao.crear(actividadId, (actividad) => {
-            if (!actividad) throw new ErrorReserva(404, 'Actividad inexistente')
+        const reserva = await this.#modelo.crear(actividadId, (actividad) => {
+            if (!actividad) throw Object.assign(new Error('Actividad inexistente'), { status: 404 })
             const ahora = new Date()
             const fechaActividad = new Date(actividad.fechaInicio)
             if (!Number.isFinite(fechaActividad.getTime()) || fechaActividad <= ahora) {
-                throw new ErrorReserva(409, 'La actividad ya no admite reservas')
+                throw Object.assign(new Error('La actividad ya no admite reservas'), { status: 409 })
             }
             if (!Number.isSafeInteger(actividad.cupo) || (actividad.cuposReservados ?? 0) >= actividad.cupo) {
-                throw new ErrorReserva(409, 'No quedan cupos disponibles')
+                throw Object.assign(new Error('No quedan cupos disponibles'), { status: 409 })
             }
             const modelo = new Reserva({
                 usuarioId: propietario,
@@ -59,24 +58,24 @@ class ServicioReservas {
             modelo.validar()
             return modelo.get()
         })
-        return presentar(reserva)
+        return this.#presentar(reserva)
     }
 
-    async cancelar(usuarioId, reservaId, cuerpo) {
+    cancelar = async (usuarioId, reservaId, cuerpo) => {
         const propietario = Reserva.validarUsuario(usuarioId)
         const id = Reserva.validarCancelacion(reservaId, cuerpo)
-        const reserva = await this.#dao.cancelar(propietario, id, (actual, actividad) => {
-            if (!actual) throw new ErrorReserva(404, 'Reserva inexistente')
+        const reserva = await this.#modelo.cancelar(propietario, id, (actual, actividad) => {
+            if (!actual) throw Object.assign(new Error('Reserva inexistente'), { status: 404 })
             if (actual.estado === 'cancelada') return null
 
             const ahora = new Date()
             const inicio = new Date(actividad?.fechaInicio).getTime()
             if (!Number.isFinite(inicio) || inicio - ahora.getTime() < ANTICIPACION_MS) {
-                throw new ErrorReserva(409, 'La cancelación requiere al menos 12 horas de anticipación')
+                throw Object.assign(new Error('La cancelación requiere al menos 12 horas de anticipación'), { status: 409 })
             }
             return Reserva.validarCambioEstado(ahora)
         })
-        return presentar(reserva)
+        return this.#presentar(reserva)
     }
 }
 

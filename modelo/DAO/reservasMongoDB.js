@@ -1,15 +1,14 @@
 import { ObjectId } from 'mongodb'
 import CnxMongoDB from './CnxMongoDB.js'
-import ErrorReserva from '../../errores/ErrorReserva.js'
 
 class ReservasMongoDB {
-    #validarConexion() {
+    #validarConexion = () => {
         if (!CnxMongoDB.connectionOK || !CnxMongoDB.db || !CnxMongoDB.client) {
             throw new Error('Error de conexión a base de datos')
         }
     }
 
-    async preparar() {
+    preparar = async () => {
         this.#validarConexion()
         const reservas = CnxMongoDB.db.collection('reservas')
         await reservas.createIndex({ usuarioId: 1, actividadId: 1 }, {
@@ -19,7 +18,7 @@ class ReservasMongoDB {
         await reservas.createIndex({ usuarioId: 1, fechaReserva: -1 })
     }
 
-    #consultar(filtro) {
+    #consultar = (filtro) => {
         this.#validarConexion()
         return CnxMongoDB.db.collection('reservas')
             .aggregate([
@@ -35,11 +34,11 @@ class ReservasMongoDB {
             ]).toArray()
     }
 
-    listar(usuarioId) {
+    listar = (usuarioId) => {
         return this.#consultar({ usuarioId: new ObjectId(usuarioId) })
     }
 
-    async obtenerPropia(usuarioId, reservaId) {
+    obtenerPropia = async (usuarioId, reservaId) => {
         const [reserva] = await this.#consultar({
             usuarioId: new ObjectId(usuarioId),
             _id: new ObjectId(reservaId)
@@ -47,7 +46,7 @@ class ReservasMongoDB {
         return reserva
     }
 
-    async crear(actividadId, prepararReserva) {
+    crear = async (actividadId, prepararReserva) => {
         this.#validarConexion()
         const reservas = CnxMongoDB.db.collection('reservas')
         const actividades = CnxMongoDB.db.collection('actividades')
@@ -61,20 +60,20 @@ class ReservasMongoDB {
                     _id: id,
                     $expr: { $lt: [{ $ifNull: ['$cuposReservados', 0] }, '$cupo'] }
                 }, { $inc: { cuposReservados: 1 } }, { session })
-                if (!resultado.modifiedCount) throw new ErrorReserva(409, 'No quedan cupos disponibles')
+                if (!resultado.modifiedCount) throw Object.assign(new Error('No quedan cupos disponibles'), { status: 409 })
 
                 const { insertedId } = await reservas.insertOne(reserva, { session })
                 return { ...reserva, _id: insertedId, datosActividad: actividad }
             }))
         } catch (error) {
             if (error.code === 11000) {
-                throw new ErrorReserva(409, 'Ya tenés una reserva confirmada para esta actividad')
+                throw Object.assign(new Error('Ya tenés una reserva confirmada para esta actividad'), { status: 409 })
             }
             throw error
         }
     }
 
-    async cancelar(usuarioId, reservaId, prepararCancelacion) {
+    cancelar = async (usuarioId, reservaId, prepararCancelacion) => {
         this.#validarConexion()
         const reservas = CnxMongoDB.db.collection('reservas')
         const actividades = CnxMongoDB.db.collection('actividades')

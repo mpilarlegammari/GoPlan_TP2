@@ -11,12 +11,11 @@ import CnxMongoDB from '../modelo/DAO/CnxMongoDB.js'
 import Reserva from '../modelo/Reserva.js'
 import ReservasFactory from '../modelo/DAO/reservasFactory.js'
 import RouterActividades from '../router/actividades.js'
-import routerReservas from '../router/reservas.js'
-import { manejarErrorReserva } from '../controlador/reservas.js'
-import generarComprobanteReserva from '../servicio/comprobanteReserva.js'
+import RouterReservas from '../router/reservas.js'
+import ServicioComprobanteReserva from '../servicio/comprobanteReserva.js'
 
 test('Genera un PDF para una reserva sin actividad disponible', async () => {
-    const pdf = await generarComprobanteReserva({
+    const pdf = await new ServicioComprobanteReserva().generar({
         id: new ObjectId().toHexString(),
         actividad: 'Actividad eliminada',
         fechaActividad: null,
@@ -77,7 +76,8 @@ test('Reservas HTTP con transacciones reales', { skip: !uri }, async (t) => {
     const app = express()
     app.use(express.json({ limit: '16kb' }))
     app.use(cookieParser())
-    app.use('/api/reservas', routerReservas, manejarErrorReserva)
+    const routerReservas = new RouterReservas()
+    app.use('/api/reservas', routerReservas.config(), routerReservas.manejarError)
     app.use('/api/actividades', new RouterActividades().config())
     const server = app.listen(0, '127.0.0.1')
     t.after(() => new Promise((resolver) => server.close(resolver)))
