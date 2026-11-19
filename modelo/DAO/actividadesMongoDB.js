@@ -24,9 +24,10 @@ class ModeloMongoDB{
     }
 
     guardarActividad = async (actividad) => {
-        
-        await CnxMongoDB.db.collection('actividades').insertOne(actividad)
-        return actividad
+        this.#validarConexion()
+        const documento = actividad.get()
+        const { insertedId } = await CnxMongoDB.db.collection('actividades').insertOne(documento)
+        return { ...documento, _id: insertedId }
     }
 
     modificarActividad = async (id, actividad) => {

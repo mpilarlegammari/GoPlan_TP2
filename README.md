@@ -220,9 +220,9 @@ GET http://localhost:8080/api/actividades
 <details>
 <summary><strong>POST</strong> <code>/api/actividades</code> — Crear actividad</summary>
 
-Acceso público actualmente. Valida el alta con Joi. La fecha debe ser futura. La ubicación del ejemplo es ilustrativa; obtener códigos reales de los endpoints de ubicaciones.
+Requiere una sesión válida con rol `admin`. Valida el alta con Joi y requiere una fecha futura. El origen, si se envía, debe coincidir con `APP_ORIGIN`.
 
-**Autenticación:** no requiere sesión.
+**Autenticación:** cookie HttpOnly `goplan_session` de un usuario administrador.
 
 **Parameters**
 
@@ -232,10 +232,23 @@ Sin parámetros de ruta ni query.
 
 ```http
 POST http://localhost:8080/api/actividades
-Content-Type: application/json
+Content-Type: multipart/form-data
 ```
 
-**Request body** · obligatorio · `application/json`
+**Request body** · obligatorio · `multipart/form-data`
+
+Enviar el campo de texto `actividad` con el objeto completo serializado con `JSON.stringify`. Adjuntar opcionalmente un único archivo en `imagen`. El cliente debe dejar que el navegador defina el `Content-Type` y su boundary.
+
+```js
+const formData = new FormData()
+formData.append('actividad', JSON.stringify({
+  // mismos campos y estructura que ActividadEntrada
+}))
+formData.append('imagen', archivo)
+fetch('/api/actividades', { method: 'POST', body: formData, credentials: 'include' })
+```
+
+El campo `actividad` contiene este JSON:
 
 ```json
 {
@@ -272,16 +285,23 @@ Content-Type: application/json
 | `cupo` | integer | Sí | Mín. 1 |
 | `precio` | number | Sí | Mín. 0 |
 | `ubicacion` | object | Sí | Ver esquema Ubicacion |
+| `imagen` | file | No | Un único archivo JPEG, PNG o WebP; máximo 5 MB. Se verifica la firma binaria además del MIME declarado. |
 
 **Responses**
 
 | Code | Description |
 |---|---|
-| `200` | Actividad guardada. La implementación devuelve 200, no 201. |
-| `400` | Datos rechazados por Joi. |
-| `500` | Error de persistencia. |
+| `201` | Actividad creada; incluye `imagen` (URL pública) e `imagenPublicId` cuando se adjuntó archivo. |
+| `400` | JSON serializado inválido, formato de carga incorrecto o datos rechazados por Joi. |
+| `401` | Sesión ausente, inválida o vencida. |
+| `403` | Usuario sin rol `admin` u origen no permitido. |
+| `413` | Imagen superior a 5 MB. |
+| `415` | Formato no admitido o contenido que no es JPEG, PNG o WebP válido. |
+| `502` | Falló la subida a Cloudinary. |
+| `503` | Faltan credenciales de Cloudinary. |
+| `500` | Falló la persistencia; el backend intenta eliminar de Cloudinary la imagen recién subida. |
 
-**Example value · 200**
+**Example value · 201**
 
 ```json
 {
@@ -306,9 +326,13 @@ Content-Type: application/json
       "nombre": "Ciudad de ejemplo"
     },
     "direccion": "Avenida de ejemplo 1234"
-  }
+  },
+  "imagen": "https://res.cloudinary.com/<cloud>/image/upload/<archivo>",
+  "imagenPublicId": "goplan/actividades/<archivo>"
 }
 ```
+
+Las actividades ya existentes y las nuevas sin archivo siguen siendo válidas; ambos campos de imagen son opcionales. El archivo se recibe temporalmente en memoria y el backend persiste en MongoDB la URL HTTPS y el `public_id` devueltos por Cloudinary.
 
 </details>
 
@@ -605,6 +629,12 @@ El puerto actual está fijado en `8080` en `config.js`. `npm run dev` utiliza `n
 | `JWT_SECRET` | Firma y verificación de JWT | Clave temporal aleatoria por proceso; reiniciar invalida las sesiones |
 | `APP_ORIGIN` | Origen permitido para los POST de autenticación | `http://localhost:8080` |
 | `CSC_API_KEY` | Clave del servicio CountryStateCity, utilizada solo desde el backend | Sin clave; ubicaciones responde con error |
+| `CLOUDINARY_CLOUD_NAME` | Nombre del cloud de Cloudinary | Sin valor; la subida responde `503` |
+| `CLOUDINARY_API_KEY` | Clave API privada de Cloudinary | Sin valor; la subida responde `503` |
+| `CLOUDINARY_API_SECRET` | Secreto API privado de Cloudinary | Sin valor; la subida responde `503` |
+| `CLOUDINARY_FOLDER` | Carpeta donde se guardan las imágenes | `goplan/actividades` |
+
+Configurar las tres credenciales de Cloudinary en variables de entorno del entorno local o del despliegue. No guardar credenciales reales en el repositorio; `.env` debe permanecer local.
 
 ## Probar la sesión en Postman
 
@@ -623,7 +653,7 @@ El login requiere un usuario activo existente en la colección `usuarios` de la 
 
 ## Alcance y pruebas
 
-La API incluye las operaciones de reservas propias documentadas abajo. Se incluyen alta de usuarios y modificación del perfil propio. Se incluye login con Google. No se incluye administración de otros usuarios. El rol todavía no restringe las operaciones de actividades.
+La API incluye las operaciones de reservas propias documentadas abajo. Se incluyen alta de usuarios y modificación del perfil propio. Se incluye login con Google. No se incluye administración de otros usuarios. Crear y borrar actividades requiere rol `admin`; la modificación con `PUT` todavía no está restringida.
 
 Ejecutar `node --test` para las pruebas HTTP del login con persistencia simulada. `npm test` ejecuta las pruebas disponibles con Node.
 
@@ -661,7 +691,7 @@ Configurar `GOOGLE_CLIENT_ID` en `.env` con el ID OAuth de tipo aplicación web.
 
 La credencial Google se mantiene solamente en memoria durante la finalización del registro; no se guarda en localStorage ni en MongoDB. El logout elimina las cookies de GoPlan y desactiva la selección automática de Google en el navegador, sin cerrar la cuenta de Google del usuario.
 
-Pruebas: `node --test`. La suite de Google simula el proveedor y la persistencia; la verificación completa con una cuenta real se realiza en el navegador. La carpeta `test/` sigue excluida de Git por la configuración existente.
+Pruebas: `npm test`. Las pruebas de alta de actividad con imágenes usan un almacenamiento Cloudinary simulado y persistencia en memoria; no necesitan credenciales ni suben archivos a una cuenta real. Para comprobar la integración real, configurar las credenciales de Cloudinary y MongoDB de prueba y realizar un alta autenticada como administrador. Las pruebas de reservas contra MongoDB requieren `MONGODB_TEST_URI`; esa integración se omite si no está configurada.
 
 ## Reservas propias
 

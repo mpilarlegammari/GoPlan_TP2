@@ -8,6 +8,8 @@ fechaInicio= null
 cupo= null
 precio= null
 ubicacion= null
+imagen = null
+imagenPublicId = null
 
     constructor(actividad = {}) {
         const {
@@ -17,7 +19,9 @@ ubicacion= null
         fechaInicio,
         cupo,
         precio,
-        ubicacion
+        ubicacion,
+        imagen,
+        imagenPublicId
         } = actividad || {}
 
         this.nombre = nombre
@@ -26,6 +30,8 @@ ubicacion= null
         this.fechaInicio = fechaInicio
         this.cupo = cupo
         this.precio = precio
+        this.imagen = imagen
+        this.imagenPublicId = imagenPublicId
 
         this.ubicacion = ubicacion && {
             pais: ubicacion.pais && {
@@ -43,7 +49,7 @@ ubicacion= null
             direccion: ubicacion.direccion
         }
 
-        }
+    }
     static validarFechaModificacion(fechaInicio) {
         const { error, value } = Joi.date().iso().required().validate(fechaInicio)
         if (error) {
@@ -68,6 +74,9 @@ ubicacion= null
         cupo: Joi.number().integer().min(1).required(),
 
         precio: Joi.number().min(0).required(),
+
+        imagen: Joi.string().uri({ scheme: ['https'] }).optional(),
+        imagenPublicId: Joi.string().trim().min(1).optional(),
 
         ubicacion: Joi.object({
             pais: Joi.object({
@@ -105,7 +114,9 @@ ubicacion= null
         fechaInicio: this.fechaInicio,
         cupo: this.cupo,
         precio: this.precio,
-        ubicacion: this.ubicacion}
+        ubicacion: this.ubicacion,
+        ...(this.imagen !== undefined && { imagen: this.imagen }),
+        ...(this.imagenPublicId !== undefined && { imagenPublicId: this.imagenPublicId })}
     }
 }
 

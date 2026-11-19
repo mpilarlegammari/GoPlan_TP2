@@ -9,6 +9,18 @@ export const protegerOrigen = (req, res, next) => {
     next()
 }
 
+// Variante exclusiva del alta multipart de actividades. El resto de endpoints
+// conserva protegerOrigen y su requisito de application/json.
+export const protegerOrigenMultipart = (req, res, next) => {
+    if ((req.get('origin') && req.get('origin') !== config.APP_ORIGIN) || req.get('sec-fetch-site') === 'cross-site') {
+        return res.status(403).json({ error: 'Origen no permitido' })
+    }
+    if (!req.is('multipart/form-data')) {
+        return res.status(415).json({ error: 'Se requiere multipart/form-data' })
+    }
+    next()
+}
+
 // Límite local al proceso: diez intentos por IP cada quince minutos.
 // Un despliegue con varias instancias requiere un almacén compartido.
 export function limitarLogin() {

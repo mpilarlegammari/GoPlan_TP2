@@ -15,6 +15,10 @@ const BASE = process.env.BASE || 'test'
 const JWT_SECRET = process.env.JWT_SECRET || randomBytes(32).toString('hex')
 const APP_ORIGIN = process.env.APP_ORIGIN || 'http://localhost:8080'
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID?.trim() || ''
+const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || ''
+const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY || ''
+const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET || ''
+const CLOUDINARY_FOLDER = process.env.CLOUDINARY_FOLDER || 'goplan/actividades'
 
 export default {
     PORT,
@@ -24,5 +28,9 @@ export default {
     BASE,
     JWT_SECRET,
     APP_ORIGIN,
-    GOOGLE_CLIENT_ID
+    GOOGLE_CLIENT_ID,
+    CLOUDINARY_CLOUD_NAME,
+    CLOUDINARY_API_KEY,
+    CLOUDINARY_API_SECRET,
+    CLOUDINARY_FOLDER
 }

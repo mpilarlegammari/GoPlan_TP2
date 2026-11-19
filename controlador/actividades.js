@@ -4,21 +4,29 @@ class Controlador{
     // TODO: En todos los manejadores, respetar errores esperados (400/404/409) y
     // devolver mensajes genéricos para errores 500, sin exponer error.message interno.
     #servicioActividades = null
-    constructor(){
-        this.#servicioActividades = new Servicio()
+    constructor({ servicio } = {}){
+        this.#servicioActividades = servicio || new Servicio()
     }
 
     guardarActividad = async (req,res) =>{
             try {
                 //console.log(req)
-                const actividad = req.body
-                const actividadNueva = await this.#servicioActividades.guardarActividad(actividad)
-                // TODO: Responder 201 al crear una actividad.
-                res.send(actividadNueva)
+                let actividad
+                try {
+                    actividad = JSON.parse(req.body?.actividad)
+                } catch {
+                    return res.status(400).json({ error: 'El campo actividad debe contener JSON válido' })
+                }
+                if (!actividad || typeof actividad !== 'object' || Array.isArray(actividad)) {
+                    return res.status(400).json({ error: 'El campo actividad debe ser un objeto JSON' })
+                }
+                const actividadNueva = await this.#servicioActividades.guardarActividad(actividad, req.file?.buffer)
+                res.status(201).json(actividadNueva)
             }
             catch(error) {
-                const status = error.isJoi ? 400 : 500
-                res.status(status).json({ url: req.url, method: req.method, error: error.message })
+                const status = error.isJoi ? 400 : error.status || 500
+                const mensaje = status === 500 ? 'No se pudo crear la actividad' : error.message
+                res.status(status).json({ url: req.url, method: req.method, error: mensaje })
             }
     }
 
