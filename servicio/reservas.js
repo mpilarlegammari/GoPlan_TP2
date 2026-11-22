@@ -29,6 +29,27 @@ class ServicioReservas {
         return (await this.#modelo.listar(Reserva.validarUsuario(usuarioId))).map(this.#presentar)
     }
 
+    listarTodas = async () => {
+        return (await this.#modelo.listarTodas()).map(reserva => ({
+            ...this.#presentar(reserva),
+            titular: {
+                nombre: reserva.titular?.nombre ?? '',
+                apellido: reserva.titular?.apellido ?? '',
+                email: reserva.titular?.email ?? ''
+            }
+        }))
+    }
+
+    cancelarAdministrativa = async (reservaId, cuerpo) => {
+        const id = Reserva.validarCancelacion(reservaId, cuerpo)
+        const reserva = await this.#modelo.cancelar(null, id, actual => {
+            if (!actual) throw Object.assign(new Error('Reserva inexistente'), { status: 404 })
+            if (actual.estado === 'cancelada') return null
+            return Reserva.validarCambioEstado(new Date())
+        })
+        return this.#presentar(reserva)
+    }
+
     obtenerPropia = async (usuarioId, reservaId) => {
         const reserva = await this.#modelo.obtenerPropia(
             Reserva.validarUsuario(usuarioId), Reserva.validarId(reservaId)

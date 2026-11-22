@@ -38,6 +38,25 @@ class ReservasMongoDB {
         return this.#consultar({ usuarioId: new ObjectId(usuarioId) })
     }
 
+    listarTodas = async () => {
+        this.#validarConexion()
+        return CnxMongoDB.db.collection('reservas').aggregate([
+            { $sort: { fechaReserva: -1 } },
+            { $lookup: { from: 'actividades', localField: 'actividadId', foreignField: '_id', as: 'datosActividad' } },
+            { $unwind: { path: '$datosActividad', preserveNullAndEmptyArrays: true } },
+            { $lookup: {
+                from: 'usuarios',
+                let: { titular: '$usuarioId' },
+                pipeline: [
+                    { $match: { $expr: { $eq: ['$_id', '$$titular'] } } },
+                    { $project: { nombre: 1, apellido: 1, email: 1 } }
+                ],
+                as: 'titular'
+            } },
+            { $unwind: { path: '$titular', preserveNullAndEmptyArrays: true } }
+        ]).toArray()
+    }
+
     obtenerPropia = async (usuarioId, reservaId) => {
         const [reserva] = await this.#consultar({
             usuarioId: new ObjectId(usuarioId),
@@ -77,7 +96,10 @@ class ReservasMongoDB {
         this.#validarConexion()
         const reservas = CnxMongoDB.db.collection('reservas')
         const actividades = CnxMongoDB.db.collection('actividades')
-        const filtro = { _id: new ObjectId(reservaId), usuarioId: new ObjectId(usuarioId) }
+        const filtro = {
+            _id: new ObjectId(reservaId),
+            ...(usuarioId && { usuarioId: new ObjectId(usuarioId) })
+        }
         return CnxMongoDB.client.withSession((session) => session.withTransaction(async () => {
             const reserva = await reservas.findOne(filtro, { session })
             const actividad = reserva && await actividades.findOne({ _id: reserva.actividadId }, { session })

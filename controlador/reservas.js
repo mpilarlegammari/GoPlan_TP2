@@ -22,6 +22,18 @@ class ControladorReservas {
         } catch (error) { this.#error(res, error) }
     }
 
+    listarTodas = async (_req, res) => {
+        try {
+            res.json(await this.#servicio.listarTodas())
+        } catch (error) { this.#error(res, error) }
+    }
+
+    cancelarAdministrativa = async (req, res) => {
+        try {
+            res.json(await this.#servicio.cancelarAdministrativa(req.params.id, req.body))
+        } catch (error) { this.#error(res, error) }
+    }
+
     descargarComprobante = async (req, res) => {
         try {
             const { _id, nombre, apellido } = req.usuario

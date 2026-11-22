@@ -61,10 +61,10 @@ test('Reservas HTTP con transacciones reales', { skip: !uri }, async (t) => {
     CnxMongoDB.connectionOK = true
     await ReservasFactory.get().preparar()
 
-    const usuarios = [new ObjectId(), new ObjectId()]
+    const usuarios = [new ObjectId(), new ObjectId(), new ObjectId()]
     await db.collection('usuarios').insertMany(usuarios.map((_id, i) => ({
         _id, nombre: 'Usuario de prueba', email: 'usuario' + i + '@example.com',
-        rol: i === 0 ? 'admin' : 'usuario', activo: true
+        rol: i === 2 ? 'admin' : 'usuario', activo: true
     })))
     const actividades = db.collection('actividades')
     const reservas = db.collection('reservas')
@@ -184,7 +184,7 @@ test('Reservas HTTP con transacciones reales', { skip: !uri }, async (t) => {
         const { id } = await (await alta(actividadId)).json()
         const ruta = '/actividades/' + actividadId
         const editar = (cuerpo) => llamar(ruta, { method: 'PUT', cuerpo })
-        const borrar = () => llamar(ruta, { method: 'DELETE' })
+        const borrar = () => llamar(ruta, { method: 'DELETE', usuario: 2 })
         assert.equal((await editar({ nombre: 'Nombre nuevo', fechaInicio: futuro.toISOString() })).status, 200)
         const historial = async () => (await (await llamar('/reservas')).json())
             .find((reserva) => reserva.id === id)
@@ -210,5 +210,29 @@ test('Reservas HTTP con transacciones reales', { skip: !uri }, async (t) => {
         assert.equal(cancelada.fechaActividad, null)
         assert.equal(cancelada.estado, 'cancelada')
         assert.deepEqual(await (await cancelar(id)).json(), cancelada)
+    })
+    await t.test('administración de reservas y separación de roles', async () => {
+        assert.equal((await llamar('/reservas', { usuario: 2 })).status, 403)
+        assert.equal((await alta(await crearActividad(1), 2)).status, 403)
+        assert.equal((await llamar('/reservas/admin')).status, 403)
+        assert.equal((await llamar('/reservas/admin', { usuario: null })).status, 401)
+        const actividadId = await crearActividad(1, new Date(Date.now() + 3600000))
+        const reserva = await (await alta(actividadId)).json()
+        assert.equal((await cancelar(reserva.id)).status, 409)
+        const listado = await llamar('/reservas/admin', { usuario: 2 })
+        assert.equal(listado.status, 200)
+        const propia = (await listado.json()).find(actual => actual.id === reserva.id)
+        assert.equal(propia.titular.email, 'usuario0@example.com')
+        const ruta = '/reservas/admin/' + reserva.id + '/cancelar'
+        assert.equal((await llamar(ruta, { method: 'PATCH', cuerpo: {} })).status, 403)
+        assert.equal((await llamar(ruta, {
+            method: 'PATCH', usuario: 2, cuerpo: {}, origen: 'https://otro.example'
+        })).status, 403)
+        const cancelarAdmin = () => llamar(ruta, { method: 'PATCH', usuario: 2, cuerpo: {} })
+        const primera = await (await cancelarAdmin()).json()
+        const segunda = await (await cancelarAdmin()).json()
+        assert.equal(primera.estado, 'cancelada')
+        assert.equal(primera.fechaCancelacion, segunda.fechaCancelacion)
+        assert.equal((await documento(actividadId)).cuposReservados, 0)
     })
 })

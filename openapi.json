@@ -1016,6 +1016,58 @@
         }
       }
     },
+    "/api/reservas/admin": {
+      "get": {
+        "tags": ["Reservas"],
+        "summary": "Historial general para administradores con nombre, apellido y email del titular",
+        "security": [{ "cookieAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Reservas confirmadas y canceladas con titular",
+            "content": { "application/json": { "schema": {
+              "type": "array",
+              "items": { "allOf": [
+                { "$ref": "#/components/schemas/Reserva" },
+                { "type": "object", "properties": {
+                  "titular": { "type": "object", "properties": {
+                    "nombre": { "type": "string" },
+                    "apellido": { "type": "string" },
+                    "email": { "type": "string" }
+                  } }
+                } }
+              ] }
+            } } }
+          },
+          "401": { "description": "Sesión requerida" },
+          "403": { "description": "Se requiere rol admin" },
+          "500": { "description": "Error interno" }
+        }
+      }
+    },
+    "/api/reservas/admin/{id}/cancelar": {
+      "patch": {
+        "tags": ["Reservas"],
+        "summary": "Cancelar como administrador y devolver el cupo",
+        "description": "Admite cancelar sin plazo de anticipación. Repetir la solicitud conserva la cancelación y devuelve un solo cupo. Requiere origen permitido y JSON.",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true,
+          "schema": { "type": "string", "pattern": "^[a-fA-F0-9]{24}$" } }],
+        "requestBody": { "required": true, "content": { "application/json": {
+          "schema": { "type": "object", "additionalProperties": false, "maxProperties": 0 }
+        } } },
+        "responses": {
+          "200": { "description": "Reserva cancelada", "content": { "application/json": {
+            "schema": { "$ref": "#/components/schemas/Reserva" }
+          } } },
+          "400": { "description": "Datos inválidos" },
+          "401": { "description": "Sesión requerida" },
+          "403": { "description": "Rol u origen no permitido" },
+          "404": { "description": "Reserva inexistente" },
+          "415": { "description": "JSON requerido" },
+          "500": { "description": "Error interno" }
+        }
+      }
+    },
     "/api/reservas": {
       "get": {
         "tags": [

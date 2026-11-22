@@ -665,6 +665,15 @@ Pruebas: `node --test`. La suite de Google simula el proveedor y la persistencia
 
 ## Reservas propias
 
+El administrador accede a `GET /api/reservas/admin` para consultar el historial general,
+incluidos nombre, apellido y correo del titular. Puede cancelar desde
+`PATCH /api/reservas/admin/{id}/cancelar` con cuerpo `{}`. Estas rutas requieren
+rol `admin` y la escritura conserva la protección de origen. La cancelación
+administrativa permite actuar sin el plazo de 12 horas, devuelve el cupo en la
+misma transacción y repetirla conserva la fecha de cancelación sin devolver otro cupo.
+Las rutas de reservas propias, alta y comprobante requieren rol `usuario`.
+Un rol sin permiso recibe `403`; la ausencia de sesión devuelve `401`.
+
 Las tres operaciones requieren una sesión válida en la cookie HttpOnly `goplan_session`. Para las escrituras, enviá `Content-Type: application/json`. Si la solicitud incluye `Origin`, debe coincidir con `APP_ORIGIN`.
 
 | Método y ruta | Entrada | Respuesta exitosa |
