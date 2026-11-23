@@ -194,3 +194,88 @@ test('si la edición falla elimina solo la foto nueva y conserva la anterior', a
     await assert.rejects(servicio.modificarActividad(idEdicion, { cupo: 1 }, pngValido), /Conflicto de cupo/)
     assert.deepEqual(eliminadas, ['goplan/nueva'])
 })
+
+test('edición rechaza campos inválidos o internos sin escribir ni subir imágenes', async t => {
+    let escrituras = 0
+    let subidas = 0
+    const ubicacion = actividadValida().ubicacion
+    const api = await iniciarApi({
+        modelo: {
+            obtenerActividad: async () => ({ _id: idEdicion }),
+            modificarActividad: async () => { escrituras++ }
+        },
+        almacenamientoImagenes: {
+            subir: async () => { subidas++ },
+            eliminar: async () => {}
+        }
+    })
+    t.after(() => new Promise(resolve => api.server.close(resolve)))
+    const invalidos = [
+        {}, { nombre: '' }, { nombre: '  ' }, { nombre: 'ab' }, { nombre: 'a'.repeat(101) },
+        { descripcion: 'corta' }, { categoria: 'ab' }, { precio: -10 }, { precio: '100' },
+        { cupo: 0 }, { cupo: 1.5 }, { cupo: '10' }, { cupo: null },
+        { fechaInicio: 'fecha inválida' }, { fechaInicio: '2026-02-30T10:00:00Z' },
+        { fechaInicio: '2025-02-29T10:00:00Z' }, { campoInventado: true }, { _id: idEdicion },
+        { cuposReservados: 0 }, { 'cuposReservados.valor': 0 }, { 'ubicacion.direccion': 'Calle 123' },
+        { imagen: 'https://example.com/ajena.png' }, { imagenPublicId: 'otra/carpeta/imagen' },
+        { ubicacion: {} }, { ubicacion: { ...ubicacion, direccion: 'ab' } },
+        { ubicacion: { ...ubicacion, pais: { ...ubicacion.pais, codigo: 'Argentina' } } },
+        { ubicacion: { ...ubicacion, ciudad: { nombre: 'Tigre', idExterno: '123' } } },
+        { ubicacion: { ...ubicacion, campoInventado: true } }
+    ]
+    for (const cambios of invalidos) {
+        const respuesta = await fetch(`${api.url}/${idEdicion}`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cambios)
+        })
+        assert.equal(respuesta.status, 400, JSON.stringify(cambios))
+        assert.equal(typeof (await respuesta.json()).error, 'string')
+    }
+    assert.equal((await enviar(`${api.url}/${idEdicion}`, {
+        method: 'PUT', actividad: { precio: -10 }, imagen: pngValido
+    })).status, 400)
+    assert.equal(escrituras, 0)
+    assert.equal(subidas, 0)
+})
+
+test('edición normaliza textos y fecha, y acepta ubicación completa sin campos extra', async t => {
+    let guardado
+    const api = await iniciarApi({
+        modelo: { modificarActividad: async (_id, cambios) => { guardado = cambios; return { _id, ...cambios } } }
+    })
+    t.after(() => new Promise(resolve => api.server.close(resolve)))
+    const datos = actividadValida()
+    const fecha = '2030-01-10T10:00:15.123-03:00'
+    const respuesta = await fetch(`${api.url}/${idEdicion}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            ...datos, nombre: '  Caminata urbana  ', fechaInicio: fecha,
+            ubicacion: { ...datos.ubicacion, direccion: '  Calle 1234  ' }
+        })
+    })
+    assert.equal(respuesta.status, 200)
+    assert.equal(guardado.nombre, 'Caminata urbana')
+    assert.equal(guardado.ubicacion.direccion, 'Calle 1234')
+    assert.ok(guardado.fechaInicio instanceof Date)
+    assert.equal(guardado.fechaInicio.toISOString(), '2030-01-10T13:00:15.123Z')
+    assert.equal(typeof guardado.cupo, 'number')
+    assert.equal(typeof guardado.precio, 'number')
+})
+
+test('edición permite reemplazar solo la imagen y valida el ID también sin archivo', async t => {
+    let cambios
+    const api = await iniciarApi({
+        modelo: {
+            obtenerActividad: async () => ({ _id: idEdicion }),
+            modificarActividad: async (_id, datos) => { cambios = datos; return { _id, ...datos } }
+        }
+    })
+    t.after(() => new Promise(resolve => api.server.close(resolve)))
+    assert.equal((await enviar(`${api.url}/${idEdicion}`, {
+        method: 'PUT', actividad: {}, imagen: pngValido
+    })).status, 200)
+    assert.deepEqual(Object.keys(cambios).sort(), ['imagen', 'imagenPublicId'])
+    const invalida = await fetch(`${api.url}/incorrecto`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre: 'Nombre válido' })
+    })
+    assert.equal(invalida.status, 400)
+})

@@ -47,17 +47,13 @@ class Servicio{
         }
     }
 
-    // TODO: Solicitar validación y normalización al modelo Actividad antes de modificar;
-    // aceptar únicamente campos editables y rechazar campos adicionales.
     modificarActividad = async (id, actividad, imagenBuffer)=>{
-        if (actividad && Object.hasOwn(actividad, 'fechaInicio')) {
-            actividad = { ...actividad, fechaInicio: Actividad.validarFechaModificacion(actividad.fechaInicio) }
-        }
-        if (!imagenBuffer) return this.#modelo.modificarActividad(id, actividad)
-
-        if (!/^[a-f0-9]{24}$/i.test(id)) {
+        if (typeof id !== 'string' || !/^[a-f0-9]{24}$/i.test(id)) {
             throw Object.assign(new Error('El identificador de actividad es inválido'), { status: 400 })
         }
+        actividad = Actividad.validarModificacion(actividad, { conImagen: Boolean(imagenBuffer) })
+        if (!imagenBuffer) return this.#modelo.modificarActividad(id, actividad)
+
         const anterior = await this.#modelo.obtenerActividad(id)
         if (!anterior?._id) return null
         const imagenSubida = await this.#almacenamientoImagenes.subir(imagenBuffer)
