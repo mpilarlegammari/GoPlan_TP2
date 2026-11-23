@@ -729,3 +729,13 @@ Las reservas nuevas guardan `actividadId` como referencia. La API consulta el no
 El arranque conserva los índices existentes de `reservas`. El índice único parcial impide duplicar reservas confirmadas y las transacciones actualizan el registro y la ocupación juntos. El servidor de MongoDB debe admitir transacciones, como un replica set o Atlas. Los registros existentes pueden leerse sin migración.
 
 Para ejecutar las pruebas de integración, configurá `MONGODB_TEST_URI` con un replica set local y ejecutá `node --test tests/reservas.test.js`. Por ejemplo, `mongodb://127.0.0.1:27017/?replicaSet=rs0`. La prueba crea una base aislada de nombre aleatorio y la elimina al finalizar. Sin esa variable, `npm test` ejecuta las pruebas disponibles y omite la integración con MongoDB.
+
+## Editar actividades con foto
+
+PUT /api/actividades/:id exige sesión de administrador y valida el origen.
+Acepta application/json para editar sin reemplazar la foto, o multipart/form-data
+con `actividad` (objeto JSON serializado) e `imagen` opcional (JPEG, PNG o WebP,
+hasta 5 MB), usando la misma carga validada que el alta.
+La nueva foto se sube a Cloudinary y su referencia se guarda en MongoDB. Si el
+guardado falla se descarta la nueva foto; si funciona se elimina la anterior.
+Desplegar este cambio en Render junto con el frontend para habilitar el reemplazo.

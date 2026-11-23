@@ -36,6 +36,7 @@ async function iniciarApi({ rol = 'admin', modelo, almacenamientoImagenes } = {}
         next()
     }
     const app = express()
+    app.use(express.json())
     app.use('/api/actividades', new RouterActividades({ controlador, autenticacion }).config())
     const server = app.listen(0, '127.0.0.1')
     await once(server, 'listening')
@@ -47,11 +48,11 @@ async function iniciarApi({ rol = 'admin', modelo, almacenamientoImagenes } = {}
     }
 }
 
-async function enviar(url, { actividad = actividadValida(), imagen, tipo = 'image/png', origen } = {}) {
+async function enviar(url, { actividad = actividadValida(), imagen, tipo = 'image/png', origen, method = 'POST' } = {}) {
     const form = new FormData()
     form.append('actividad', typeof actividad === 'string' ? actividad : JSON.stringify(actividad))
     if (imagen) form.append('imagen', new Blob([imagen], { type: tipo }), 'foto.png')
-    return fetch(url, { method: 'POST', body: form, ...(origen && { headers: { Origin: origen } }) })
+    return fetch(url, { method, body: form, ...(origen && { headers: { Origin: origen } }) })
 }
 
 test('alta multipart crea actividad, adjunta URL e ID Cloudinary y devuelve 201', async t => {
@@ -123,4 +124,73 @@ test('limpia en Cloudinary si MongoDB falla después de subir', async () => {
     })
     await assert.rejects(servicio.guardarActividad(actividadValida(), pngValido), /Mongo no disponible/)
     assert.deepEqual(eliminados, ['goplan/x'])
+})
+
+const idEdicion = '507f1f77bcf86cd799439012'
+
+test('edición multipart reemplaza la foto y limpia la anterior después de persistir', async t => {
+    const eventos = []
+    const anterior = { ...actividadValida(), _id: idEdicion, imagen: 'https://example.com/anterior.png', imagenPublicId: 'goplan/anterior' }
+    let cambios
+    const api = await iniciarApi({
+        modelo: {
+            obtenerActividad: async () => anterior,
+            modificarActividad: async (_id, datos) => { cambios = datos; eventos.push('guardar'); return { ...anterior, ...datos } }
+        },
+        almacenamientoImagenes: {
+            subir: async () => { eventos.push('subir'); return { imagen: 'https://example.com/nueva.png', imagenPublicId: 'goplan/nueva' } },
+            eliminar: async id => eventos.push(`eliminar:${id}`)
+        }
+    })
+    t.after(() => new Promise(resolve => api.server.close(resolve)))
+    const respuesta = await enviar(`${api.url}/${idEdicion}`, { method: 'PUT', imagen: pngValido })
+    assert.equal(respuesta.status, 200)
+    assert.equal((await respuesta.json()).imagen, 'https://example.com/nueva.png')
+    assert.equal(cambios.imagenPublicId, 'goplan/nueva')
+    assert.deepEqual(eventos, ['subir', 'guardar', 'eliminar:goplan/anterior'])
+})
+
+test('edición JSON sin archivo conserva imagen y no llama al almacenamiento', async t => {
+    let subidas = 0
+    const api = await iniciarApi({
+        modelo: { modificarActividad: async (_id, cambios) => ({ _id: idEdicion, imagen: 'https://example.com/anterior.png', ...cambios }) },
+        almacenamientoImagenes: { subir: async () => { subidas++ }, eliminar: async () => {} }
+    })
+    t.after(() => new Promise(resolve => api.server.close(resolve)))
+    const respuesta = await fetch(`${api.url}/${idEdicion}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre: 'Nombre actualizado' }) })
+    assert.equal(respuesta.status, 200)
+    assert.equal((await respuesta.json()).imagen, 'https://example.com/anterior.png')
+    assert.equal(subidas, 0)
+})
+
+test('edición exige administrador y rechaza imágenes inválidas antes de guardar', async t => {
+    for (const [rol, esperado] of [[null, 401], ['usuario', 403], ['admin', 415]]) {
+        const api = await iniciarApi({ rol })
+        t.after(() => new Promise(resolve => api.server.close(resolve)))
+        const respuesta = await enviar(`${api.url}/${idEdicion}`, { method: 'PUT', imagen: Buffer.from('no es foto') })
+        assert.equal(respuesta.status, esperado)
+    }
+})
+
+test('edición rechaza JSON multipart inválido y origen ajeno', async t => {
+    const api = await iniciarApi()
+    t.after(() => new Promise(resolve => api.server.close(resolve)))
+    assert.equal((await enviar(`${api.url}/${idEdicion}`, { method: 'PUT', actividad: '{' })).status, 400)
+    assert.equal((await enviar(`${api.url}/${idEdicion}`, { method: 'PUT', origen: 'https://otro.example' })).status, 403)
+})
+
+test('si la edición falla elimina solo la foto nueva y conserva la anterior', async () => {
+    const eliminadas = []
+    const servicio = new ServicioActividades({
+        modelo: {
+            obtenerActividad: async () => ({ _id: idEdicion, imagenPublicId: 'goplan/anterior' }),
+            modificarActividad: async () => { throw Object.assign(new Error('Conflicto de cupo'), { status: 409 }) }
+        },
+        almacenamientoImagenes: {
+            subir: async () => ({ imagen: 'https://example.com/nueva.png', imagenPublicId: 'goplan/nueva' }),
+            eliminar: async id => eliminadas.push(id)
+        }
+    })
+    await assert.rejects(servicio.modificarActividad(idEdicion, { cupo: 1 }, pngValido), /Conflicto de cupo/)
+    assert.deepEqual(eliminadas, ['goplan/nueva'])
 })

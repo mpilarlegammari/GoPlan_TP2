@@ -33,7 +33,15 @@ class Controlador{
     modificarActividad = async (req,res) =>{
             try {
                 const { id } = req.params
-                const actividad = await this.#servicioActividades.modificarActividad(id, req.body)
+                let cambios = req.body
+                if (req.is('multipart/form-data')) {
+                    try { cambios = JSON.parse(req.body?.actividad) }
+                    catch { return res.status(400).json({ error: 'El campo actividad debe contener JSON válido' }) }
+                }
+                if (!cambios || typeof cambios !== 'object' || Array.isArray(cambios)) {
+                    return res.status(400).json({ error: 'La actividad debe ser un objeto JSON' })
+                }
+                const actividad = await this.#servicioActividades.modificarActividad(id, cambios, req.file?.buffer)
 
                 if (!actividad) {
                     return res.status(404).json({ error: 'Actividad no encontrada' })
@@ -81,3 +89,4 @@ class Controlador{
 }
 
 export default Controlador
+

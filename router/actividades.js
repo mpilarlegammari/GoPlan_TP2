@@ -1,6 +1,6 @@
 import express from 'express'
 import ControladorActividades from '../controlador/actividades.js'
-import { autenticar, protegerOrigenMultipart } from '../middleware/auth.js'
+import { autenticar, protegerOrigen, protegerOrigenMultipart } from '../middleware/auth.js'
 import { manejarErrorMulter, multerImagenActividad, validarImagenActividad } from '../middleware/cargaImagenActividad.js'
 import config from '../config.js'
 
@@ -15,7 +15,7 @@ function autorizarBorrado(req, res, next) {
 
 function autorizarCreacion(req, res, next) {
     if (req.usuario?.rol !== 'admin') {
-        return res.status(403).json({ error: 'Solo un administrador puede crear actividades' })
+        return res.status(403).json({ error: 'Solo un administrador puede administrar actividades' })
     }
     next()
 }
@@ -37,7 +37,14 @@ class RouterActividades{
         router.post('/', this.autenticacion, autorizarCreacion, protegerOrigenMultipart,
             multerImagenActividad, validarImagenActividad, this.#controladorActividades.guardarActividad)
         // TODO: Usar PATCH para cambios parciales, o implementar reemplazo completo si se conserva PUT.
-        router.put('/:id',this.#controladorActividades.modificarActividad)
+        router.put('/:id', this.autenticacion, autorizarCreacion,
+            (req, res, next) => req.is('multipart/form-data')
+                ? protegerOrigenMultipart(req, res, next)
+                : protegerOrigen(req, res, next),
+            (req, res, next) => req.is('multipart/form-data')
+                ? multerImagenActividad(req, res, next)
+                : next(),
+            validarImagenActividad, this.#controladorActividades.modificarActividad)
         router.delete('/:id', autenticar(), autorizarBorrado, this.#controladorActividades.eliminarActividad)
 
         router.use(manejarErrorMulter)
@@ -47,3 +54,4 @@ class RouterActividades{
 }
 
 export default RouterActividades
+

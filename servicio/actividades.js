@@ -49,16 +49,40 @@ class Servicio{
 
     // TODO: Solicitar validación y normalización al modelo Actividad antes de modificar;
     // aceptar únicamente campos editables y rechazar campos adicionales.
-    modificarActividad = async (id, actividad)=>{
+    modificarActividad = async (id, actividad, imagenBuffer)=>{
         if (actividad && Object.hasOwn(actividad, 'fechaInicio')) {
             actividad = { ...actividad, fechaInicio: Actividad.validarFechaModificacion(actividad.fechaInicio) }
         }
-        const actividadActualizada = await this.#modelo.modificarActividad(id, actividad)
-        return actividadActualizada
+        if (!imagenBuffer) return this.#modelo.modificarActividad(id, actividad)
+
+        if (!/^[a-f0-9]{24}$/i.test(id)) {
+            throw Object.assign(new Error('El identificador de actividad es inválido'), { status: 400 })
+        }
+        const anterior = await this.#modelo.obtenerActividad(id)
+        if (!anterior?._id) return null
+        const imagenSubida = await this.#almacenamientoImagenes.subir(imagenBuffer)
+        let actualizada
+        try {
+            actualizada = await this.#modelo.modificarActividad(id, { ...actividad, ...imagenSubida })
+            if (!actualizada) await this.#limpiarImagen(imagenSubida.imagenPublicId)
+        } catch (error) {
+            await this.#limpiarImagen(imagenSubida.imagenPublicId)
+            throw error
+        }
+        // La foto anterior se elimina únicamente después de guardar su reemplazo.
+        if (actualizada && anterior.imagenPublicId && anterior.imagenPublicId !== imagenSubida.imagenPublicId) {
+            await this.#limpiarImagen(anterior.imagenPublicId)
+        }
+        return actualizada
     }
 
+    #limpiarImagen = async publicId => {
+        try { await this.#almacenamientoImagenes.eliminar(publicId) }
+        catch (error) { console.error('No se pudo limpiar la imagen de Cloudinary:', error.message) }
+    }
     eliminarActividad = async (id)=>{
         return this.#modelo.eliminarActividad(id)
     }
 }
 export default Servicio
+

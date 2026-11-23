@@ -4,3 +4,4 @@ LOGIN.md
 # TODO: Quitar esta exclusión para versionar y compartir las pruebas automáticas con el equipo.
 test/
 scripts/
+swagger.json

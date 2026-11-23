@@ -9,7 +9,7 @@ export const protegerOrigen = (req, res, next) => {
     next()
 }
 
-// Variante exclusiva del alta multipart de actividades. El resto de endpoints
+// Variante para crear y editar actividades con archivos. El resto de endpoints
 // conserva protegerOrigen y su requisito de application/json.
 export const protegerOrigenMultipart = (req, res, next) => {
     if ((req.get('origin') && req.get('origin') !== config.APP_ORIGIN) || req.get('sec-fetch-site') === 'cross-site') {
@@ -57,3 +57,4 @@ export const autenticar = () => {
         }
     }
 }
+
