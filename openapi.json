@@ -345,43 +345,34 @@
         ],
         "operationId": "crearActividad",
         "summary": "Crear actividad",
-        "description": "Acceso público actualmente. Valida el alta con Joi. La fecha debe ser futura. La ubicación del ejemplo es ilustrativa; obtener códigos reales de los endpoints de ubicaciones.",
+        "description": "Requiere sesión autenticada con rol admin y origen permitido. Recibe actividad como texto JSON serializado y una imagen JPEG, PNG o WebP opcional de hasta 5 MB. Valida el alta con Joi; la fecha debe ser futura.",
+        "security": [{ "cookieAuth": [] }],
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
+            "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/ActividadEntrada"
-              },
-              "example": {
-                "nombre": "Caminata urbana",
-                "descripcion": "Recorrido guiado por los principales puntos de la ciudad.",
-                "categoria": "Turismo",
-                "fechaInicio": "2030-12-15T14:00:00.000Z",
-                "cupo": 20,
-                "precio": 15000,
-                "ubicacion": {
-                  "pais": {
-                    "codigo": "AR",
-                    "nombre": "Argentina"
+                "type": "object",
+                "required": ["actividad"],
+                "properties": {
+                  "actividad": {
+                    "type": "string",
+                    "description": "Objeto ActividadEntrada serializado con JSON.stringify.",
+                    "example": "{\"nombre\":\"Caminata urbana\",\"descripcion\":\"Recorrido guiado por los principales puntos de la ciudad.\",\"categoria\":\"Turismo\",\"fechaInicio\":\"2030-12-15T14:00:00.000Z\",\"cupo\":20,\"precio\":15000,\"ubicacion\":{\"pais\":{\"codigo\":\"AR\",\"nombre\":\"Argentina\"},\"provincia\":{\"codigo\":\"BA\",\"nombre\":\"Buenos Aires\"},\"ciudad\":{\"idExterno\":123,\"nombre\":\"La Plata\"},\"direccion\":\"Calle 1234\"}}"
                   },
-                  "provincia": {
-                    "codigo": "CODIGO_PROVINCIA",
-                    "nombre": "Provincia de ejemplo"
-                  },
-                  "ciudad": {
-                    "idExterno": 123,
-                    "nombre": "Ciudad de ejemplo"
-                  },
-                  "direccion": "Avenida de ejemplo 1234"
+                  "imagen": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Archivo único opcional. JPEG, PNG o WebP; máximo 5 MB."
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": {
-            "description": "Actividad guardada. La implementación devuelve 200, no 201.",
+          "201": {
+            "description": "Actividad creada.",
             "content": {
               "application/json": {
                 "schema": {
@@ -415,7 +406,7 @@
             }
           },
           "400": {
-            "description": "Datos rechazados por Joi.",
+            "description": "JSON serializado inválido o datos rechazados por Joi.",
             "content": {
               "application/json": {
                 "schema": {
@@ -424,8 +415,14 @@
               }
             }
           },
+          "401": { "description": "Sesión ausente, inválida o vencida." },
+          "403": { "description": "Se requiere rol admin u origen permitido." },
+          "413": { "description": "La imagen supera 5 MB." },
+          "415": { "description": "Formato no admitido o contenido que no es JPEG, PNG o WebP válido." },
+          "502": { "description": "Falló la subida a Cloudinary." },
+          "503": { "description": "Cloudinary no está configurado." },
           "500": {
-            "description": "Error de persistencia.",
+            "description": "Error de persistencia; se intenta eliminar de Cloudinary la imagen recién subida.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1548,7 +1545,9 @@
             "properties": {
               "_id": {
                 "type": "string"
-              }
+              },
+              "imagen": { "type": "string", "format": "uri" },
+              "imagenPublicId": { "type": "string" }
             }
           }
         ]

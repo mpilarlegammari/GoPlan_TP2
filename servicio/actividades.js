@@ -2,12 +2,16 @@ import Actividad from "../modelo/Actividad.js";
 //import ModeloMem from "../modelo/DAO/actividadesMem.js";
 import ModelFactory from '../modelo/DAO/actividadesFactory.js'
 import config from '../config.js'
+import AlmacenamientoImagenesCloudinary from './almacenamientoImagenesCloudinary.js'
 
 class Servicio{
     #modelo = null
 
-    constructor(){
-         this.#modelo = ModelFactory.get(config.MODO_PERSISTENCIA)
+    #almacenamientoImagenes = null
+
+    constructor({ modelo, almacenamientoImagenes } = {}){
+         this.#modelo = modelo || ModelFactory.get(config.MODO_PERSISTENCIA)
+         this.#almacenamientoImagenes = almacenamientoImagenes || new AlmacenamientoImagenesCloudinary()
     }
 
     obtenerActividades = async (id)=>{
@@ -20,11 +24,27 @@ class Servicio{
         }
     }
 
-    guardarActividad = async (actividad)=>{
+    guardarActividad = async (actividad, imagenBuffer)=>{
         const actividadModelo = new Actividad(actividad)
         actividadModelo.validar()
-        const actividadGuardada = await this.#modelo.guardarActividad(actividadModelo)
-        return actividadGuardada
+        let imagenSubida
+        if (imagenBuffer) {
+            imagenSubida = await this.#almacenamientoImagenes.subir(imagenBuffer)
+            actividadModelo.imagen = imagenSubida.imagen
+            actividadModelo.imagenPublicId = imagenSubida.imagenPublicId
+        }
+        try {
+            return await this.#modelo.guardarActividad(actividadModelo)
+        } catch (error) {
+            if (imagenSubida) {
+                try {
+                    await this.#almacenamientoImagenes.eliminar(imagenSubida.imagenPublicId)
+                } catch (errorLimpieza) {
+                    console.error('No se pudo limpiar la imagen de Cloudinary:', errorLimpieza.message)
+                }
+            }
+            throw error
+        }
     }
 
     // TODO: Solicitar validación y normalización al modelo Actividad antes de modificar;
