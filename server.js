@@ -35,8 +35,9 @@ class Server {
         app.use('/api/auth', new RouterAuth().config())
         app.use('/api/reservas', this.#RouterReservas.config(), this.#RouterReservas.manejarError)
 
-        const server = app.listen(this.#port, () => console.log(`Servidor ApiRestful escuchando en http://localhost:${this.#port}`))
+        const server = app.listen(this.#port, () => console.log(`Servidor ApiRestful escuchando en http://localhost:${server.address().port}`))
         server.on('error', error => console.log(`Error en servidor: ${error.message}`))
+        return server
     }
 }
 

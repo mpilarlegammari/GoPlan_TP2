@@ -655,7 +655,7 @@ El login requiere un usuario activo existente en la colección `usuarios` de la 
 
 La API incluye las operaciones de reservas propias documentadas abajo. Se incluyen alta de usuarios y modificación del perfil propio. Se incluye login con Google. No se incluye administración de otros usuarios. Crear y borrar actividades requiere rol `admin`; la modificación con `PUT` todavía no está restringida.
 
-Ejecutar `node --test` para las pruebas HTTP del login con persistencia simulada. `npm test` ejecuta las pruebas disponibles con Node.
+`npm test` ejecuta toda la suite con Mocha. Las pruebas unitarias de `GET /api/reservas` y `PATCH /api/usuarios/me` se pueden ejecutar con `npm run test:unit`. El end-to-end de `GET /api/actividades` levanta el servidor en un puerto libre y usa un catálogo simulado. Se ejecuta con `npm run test:e2e`. La suite funciona sin una instancia de MongoDB ni credenciales externas.
 
 ## Alta y modificación de usuarios
 
@@ -691,7 +691,6 @@ Configurar `GOOGLE_CLIENT_ID` en `.env` con el ID OAuth de tipo aplicación web.
 
 La credencial Google se mantiene solamente en memoria durante la finalización del registro; no se guarda en localStorage ni en MongoDB. El logout elimina las cookies de GoPlan y desactiva la selección automática de Google en el navegador, sin cerrar la cuenta de Google del usuario.
 
-Pruebas: `npm test`. Las pruebas de alta de actividad con imágenes usan un almacenamiento Cloudinary simulado y persistencia en memoria; no necesitan credenciales ni suben archivos a una cuenta real. Para comprobar la integración real, configurar las credenciales de Cloudinary y MongoDB de prueba y realizar un alta autenticada como administrador. Las pruebas de reservas contra MongoDB requieren `MONGODB_TEST_URI`; esa integración se omite si no está configurada.
 
 ## Reservas propias
 
@@ -728,7 +727,6 @@ Las reservas nuevas guardan `actividadId` como referencia. La API consulta el no
 
 El arranque conserva los índices existentes de `reservas`. El índice único parcial impide duplicar reservas confirmadas y las transacciones actualizan el registro y la ocupación juntos. El servidor de MongoDB debe admitir transacciones, como un replica set o Atlas. Los registros existentes pueden leerse sin migración.
 
-Para ejecutar las pruebas de integración, configurá `MONGODB_TEST_URI` con un replica set local y ejecutá `node --test tests/reservas.test.js`. Por ejemplo, `mongodb://127.0.0.1:27017/?replicaSet=rs0`. La prueba crea una base aislada de nombre aleatorio y la elimina al finalizar. Sin esa variable, `npm test` ejecuta las pruebas disponibles y omite la integración con MongoDB.
 
 ## Editar actividades con foto
 

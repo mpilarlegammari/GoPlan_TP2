@@ -9,7 +9,9 @@
   "scripts": {
     "dev": "nodemon index.js",
     "prod": "node index.js",
-    "test": "node --test"
+    "test": "mocha \"tests/*.test.js\" --timeout 10000",
+    "test:unit": "mocha \"tests/*-unit.test.js\" --timeout 10000",
+    "test:e2e": "mocha tests/api-e2e.test.js --timeout 10000"
   },
   "dependencies": {
     "argon2": "^0.45.2",
@@ -25,5 +27,10 @@
     "mongodb": "^7.7.0",
     "multer": "^2.5.0",
     "pdfkit": "^0.20.2"
+  },
+  "devDependencies": {
+    "chai": "^6.3.0",
+    "mocha": "^12.0.3",
+    "supertest": "^7.3.2"
   }
 }
