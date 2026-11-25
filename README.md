@@ -655,7 +655,19 @@ El login requiere un usuario activo existente en la colección `usuarios` de la 
 
 La API incluye las operaciones de reservas propias documentadas abajo. Se incluyen alta de usuarios y modificación del perfil propio. Se incluye login con Google. No se incluye administración de otros usuarios. Crear y borrar actividades requiere rol `admin`; la modificación con `PUT` todavía no está restringida.
 
-`npm test` ejecuta toda la suite con Mocha. Las pruebas unitarias de `GET /api/reservas` y `PATCH /api/usuarios/me` se pueden ejecutar con `npm run test:unit`. El end-to-end de `GET /api/actividades` levanta el servidor en un puerto libre y usa un catálogo simulado. Se ejecuta con `npm run test:e2e`. La suite funciona sin una instancia de MongoDB ni credenciales externas.
+`npm test` ejecuta la suite con Mocha y MongoDB real, sin mocks de persistencia. `npm run test:integration` prueba servicios y DAO; `npm run test:e2e` levanta el servidor en un puerto libre y prueba HTTP, incluyendo registro, login, consulta de sesión, edición y logout. Ya no se llaman unitarias porque acceden a una dependencia real.
+
+La conexión usa `MONGODB_TEST_URI` cuando está definida; de lo contrario utiliza `STRCNX` del `.env` (o MongoDB local si no está configurada). La cuenta de MongoDB debe tener permisos para crear y eliminar una base de pruebas en ese servidor.
+
+Cada ejecución crea una base aislada `goplan_test_<identificador aleatorio>`. Nunca usa `BASE` como destino de las pruebas. Prepara los índices reales, limpia sus colecciones antes de cada caso y elimina únicamente esa base al terminar. Si se interrumpe el proceso abruptamente, puede quedar una base con ese prefijo para revisar manualmente. No modifica ni elimina documentos de la base de la aplicación.
+
+Configuración opcional en `.env`:
+
+```dotenv
+MONGODB_TEST_URI=mongodb://localhost:27017
+```
+
+Para Atlas se puede usar una URI `mongodb+srv://...` con acceso de red y permisos suficientes. No publicar la URI ni las credenciales. Si MongoDB no responde, las pruebas fallan: no cambian a datos simulados ni se omiten automáticamente. Las pruebas actuales consultan reservas con agregaciones reales; no verifican todavía las transacciones de creación/cancelación ni el acceso real a Google o Cloudinary.
 
 ## Alta y modificación de usuarios
 
